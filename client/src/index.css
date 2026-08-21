@@ -85,6 +85,16 @@
   .optimizer-switch span { @apply block h-4 w-4 rounded-full bg-white shadow-sm transition-transform; }
   .optimizer-switch.is-active { @apply bg-[#2563EB]; }
   .optimizer-switch.is-active span { transform: translateX(20px); }
+  .weekly-hero { @apply flex flex-col gap-1 border border-[#2563EB] bg-[#2563EB] px-4 py-4 text-white; }
+  .weekly-hero strong { @apply font-serif text-4xl leading-none tracking-[-0.05em]; }
+  .weekly-hero strong em { @apply ml-1 font-mono text-sm not-italic font-normal tracking-normal opacity-75; }
+  .weekly-hero div { @apply flex items-center gap-2 font-mono text-[10px] opacity-85; }
+  .weekly-chart { @apply grid h-32 grid-cols-7 items-end gap-1.5; }
+  .weekly-bar { @apply flex h-full min-w-0 flex-col items-center justify-end gap-1; }
+  .weekly-bar-value { @apply h-3 font-mono text-[8px] text-[#5F6167]; }
+  .weekly-bar-track { @apply flex h-20 w-full items-end bg-[#EEF0F4]; }
+  .weekly-bar-fill { @apply w-full bg-[#2563EB] transition-all; }
+  .weekly-bar-label { @apply font-mono text-[8px] text-[#77797C]; }
 }
 
 .dark body, .dark #root { background: #12161F; color: #E8EBF1; }
@@ -100,6 +110,8 @@
 .dark .tag-word.neutral { color: #BBC3D3; }
 .dark .optimizer-switch { background-color: #546176; }
 .dark .optimizer-switch.is-active { background-color: #4F8BFF; }
+.dark .weekly-hero { background-color: #2563EB; border-color: #4F8BFF; }
+.dark .weekly-bar-track { background-color: #2A3346; }
 .dark footer { border-color: rgba(232,235,241,.12) !important; }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -123,4 +135,7 @@
   .analytics-metric strong { font-size: 1rem; }
   .tag-cloud { min-height: 140px; gap: .4rem .7rem; padding: 1rem; }
   .theme-toggle { min-width: 38px; justify-content: center; padding-left: .5rem; padding-right: .5rem; }
+  .weekly-hero { padding: .9rem 1rem; }
+  .weekly-hero strong { font-size: 2rem; }
+  .weekly-chart { gap: .25rem; }
 }
