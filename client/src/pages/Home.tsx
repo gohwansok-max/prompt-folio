@@ -11,6 +11,8 @@ type AiMode = "local" | "cheapai";
 type AiModel = "gpt-5.6-sol" | "claude-sonnet-5";
 type BackupPayload = { schema: 1; exportedAt: string; library: SavedEntry[]; customTags: string[] };
 type TagFeedback = Record<string, { accepted: number; rejected: number }>;
+type FeedbackEvent = { tag: string; verdict: "accepted" | "rejected"; at: string };
+type ExclusionSettings = { minObservations: number; rejectionRate: number };
 type BackupPreview = { fileName: string; library: SavedEntry[]; customTags: string[]; newCount: number; updateCount: number; sameCount: number };
 
 const PROVIDERS: Provider[] = [
@@ -31,6 +33,9 @@ const CUSTOM_TAGS_KEY = "prompt-folio-custom-tags-v1";
 const CHEAPAI_KEY_STORAGE = "prompt-folio-cheapai-key-v1";
 const CHEAPAI_BASE_URL = "https://api.cheapai.im/v1";
 const TAG_FEEDBACK_KEY = "prompt-folio-tag-feedback-v1";
+const TAG_FEEDBACK_HISTORY_KEY = "prompt-folio-tag-feedback-history-v1";
+const TAG_EXCLUSION_SETTINGS_KEY = "prompt-folio-tag-exclusion-settings-v1";
+const DEFAULT_EXCLUSION_SETTINGS: ExclusionSettings = { minObservations: 3, rejectionRate: 70 };
 const MODEL_PRICING: Record<AiModel, { input: number; output: number }> = { "gpt-5.6-sol": { input: 7500, output: 45000 }, "claude-sonnet-5": { input: 4500, output: 22500 } };
 
 const TAG_SIGNALS = [
@@ -70,6 +75,22 @@ function readTagFeedback(): TagFeedback {
   } catch { return {}; }
 }
 
+function readFeedbackHistory(): FeedbackEvent[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const value = JSON.parse(window.localStorage.getItem(TAG_FEEDBACK_HISTORY_KEY) || "[]");
+    return Array.isArray(value) ? value.filter((item): item is FeedbackEvent => Boolean(item && typeof item.tag === "string" && (item.verdict === "accepted" || item.verdict === "rejected") && typeof item.at === "string")).slice(-500) : [];
+  } catch { return []; }
+}
+
+function readExclusionSettings(): ExclusionSettings {
+  if (typeof window === "undefined") return DEFAULT_EXCLUSION_SETTINGS;
+  try {
+    const value = JSON.parse(window.localStorage.getItem(TAG_EXCLUSION_SETTINGS_KEY) || "{}");
+    return { minObservations: Math.max(1, Math.min(20, Number(value?.minObservations) || DEFAULT_EXCLUSION_SETTINGS.minObservations)), rejectionRate: Math.max(1, Math.min(100, Number(value?.rejectionRate) || DEFAULT_EXCLUSION_SETTINGS.rejectionRate)) };
+  } catch { return DEFAULT_EXCLUSION_SETTINGS; }
+}
+
 function normalizeTags(value: string) {
   return Array.from(new Set(value.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))).slice(0, 8);
 }
@@ -90,7 +111,13 @@ function extractAiTags(content: string) {
   try { const parsed = JSON.parse(match[0]); return Array.isArray(parsed) ? normalizeTags(parsed.filter((tag): tag is string => typeof tag === "string").join(",")) : []; } catch { return []; }
 }
 
-function recommendTags(title: string, notes: string, selected: ProviderId[], savedTags: string[], kind: "profile" | "prompt", feedback: TagFeedback) {
+function isTagExcluded(tag: string, feedback: TagFeedback, settings: ExclusionSettings) {
+  const value = feedback[tag];
+  const total = (value?.accepted || 0) + (value?.rejected || 0);
+  return total >= settings.minObservations && total > 0 && (((value?.rejected || 0) / total) * 100) >= settings.rejectionRate;
+}
+
+function recommendTags(title: string, notes: string, selected: ProviderId[], savedTags: string[], kind: "profile" | "prompt", feedback: TagFeedback, settings: ExclusionSettings) {
   const source = `${title} ${notes}`.toLocaleLowerCase();
   const scores = new Map<string, number>();
   TAG_SIGNALS.forEach(({ tag, terms }) => {
@@ -100,7 +127,7 @@ function recommendTags(title: string, notes: string, selected: ProviderId[], sav
   savedTags.forEach((tag) => { if (source.includes(tag.toLocaleLowerCase())) scores.set(tag, Math.max(scores.get(tag) || 0, 3)); });
   if (selected.length) scores.set("AI도구", Math.max(scores.get("AI도구") || 0, 1));
   scores.set(kind === "profile" ? "프로필" : "재사용", 1);
-  return Array.from(scores.entries()).map(([tag, score]) => [tag, score + ((feedback[tag]?.accepted || 0) * 1.5) - ((feedback[tag]?.rejected || 0) * 2)] as const).filter(([, score]) => score > -1).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko")).slice(0, 6).map(([tag]) => tag);
+  return Array.from(scores.entries()).map(([tag, score]) => [tag, score + ((feedback[tag]?.accepted || 0) * 1.5) - ((feedback[tag]?.rejected || 0) * 2)] as const).filter(([tag, score]) => score > -1 && !isTagExcluded(tag, feedback, settings)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko")).slice(0, 6).map(([tag]) => tag);
 }
 
 function normalizeLines(value: string) {
@@ -262,6 +289,15 @@ function TagAnalyticsPanel({ feedback }: { feedback: TagFeedback }) {
   return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">05</span> FEEDBACK ANALYTICS</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">태그 추천 정확도</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><BarChart3 size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">수락·거절 기록은 이 브라우저 안에서만 집계되며, 다음 추천 순위에 반영됩니다.</p>{total === 0 ? <div className="mt-5 border border-dashed border-[#1C1D21]/15 bg-[#F0ECE4] px-4 py-5 font-mono text-[10px] leading-5 text-[#77797C]">추천 태그를 수락하거나 거절하면 정확도·선호 태그 통계가 쌓입니다.</div> : <><div className="mt-5 grid grid-cols-3 gap-2"><div className="analytics-metric"><Target size={13} /><strong>{accuracy}%</strong><span>수락률</span></div><div className="analytics-metric"><ThumbsUp size={13} /><strong>{accepted}</strong><span>수락</span></div><div className="analytics-metric"><ThumbsDown size={13} /><strong>{rejected}</strong><span>거절</span></div></div><div className="mt-4 space-y-3">{rows.map((item) => { const rate = Math.round((item.accepted / item.total) * 100); return <div key={item.tag}><div className="flex items-center justify-between font-mono text-[9px]"><span className="font-semibold text-[#4E5055]">#{item.tag}</span><span className="text-[#73757A]">수락 {item.accepted} · 거절 {item.rejected} · {rate}%</span></div><div className="mt-1 h-1.5 overflow-hidden bg-[#E7E2D9]"><div className="h-full bg-[#2563EB]" style={{ width: `${rate}%` }} /></div></div>; })}</div></>}</div>;
 }
 
+function FeedbackControlsPanel({ feedback, history, settings, updateSettings, exportAnalytics }: { feedback: TagFeedback; history: FeedbackEvent[]; settings: ExclusionSettings; updateSettings: (next: ExclusionSettings) => void; exportAnalytics: () => void }) {
+  const ranked = Object.entries(feedback).map(([tag, value]) => ({ tag, ...value, total: value.accepted + value.rejected })).filter((item) => item.total > 0).sort((a, b) => b.total - a.total || b.rejected - a.rejected);
+  const excluded = ranked.filter((item) => isTagExcluded(item.tag, feedback, settings));
+  const days = Array.from({ length: 7 }, (_, index) => { const date = new Date(); date.setDate(date.getDate() - (6 - index)); return date.toISOString().slice(0, 10); });
+  const trend = days.map((day) => ({ day, accepted: history.filter((event) => event.at.slice(0, 10) === day && event.verdict === "accepted").length, rejected: history.filter((event) => event.at.slice(0, 10) === day && event.verdict === "rejected").length }));
+  const trendMax = Math.max(1, ...trend.flatMap((day) => [day.accepted, day.rejected]));
+  return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">06</span> RECOMMENDATION CONTROLS</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">추천 제어 · 기간별 추이</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><Target size={15} /></div></div><div className="mt-5 border border-[#1C1D21]/10 bg-white/75 p-3"><div className="flex items-center justify-between gap-3"><div><span className="font-mono text-[10px] font-semibold tracking-[0.08em]">태그별 추천 제외 기준</span><p className="mt-1 font-mono text-[9px] leading-4 text-[#77797C]">관측 수와 거절률을 함께 충족한 태그는 새 추천에서 자동 제외합니다.</p></div><span className="shrink-0 font-mono text-[9px] text-[#2563EB]">{excluded.length}개 제외</span></div><div className="mt-3 grid grid-cols-2 gap-2"><label className="font-mono text-[9px] text-[#6F7175]">최소 관측 수<input type="number" min="1" max="20" value={settings.minObservations} onChange={(event) => updateSettings({ ...settings, minObservations: Math.max(1, Math.min(20, Number(event.target.value) || 1)) })} className="field-input mt-1 h-8 py-1.5 text-[10px]" /></label><label className="font-mono text-[9px] text-[#6F7175]">거절률 (%)<input type="number" min="1" max="100" value={settings.rejectionRate} onChange={(event) => updateSettings({ ...settings, rejectionRate: Math.max(1, Math.min(100, Number(event.target.value) || 1)) })} className="field-input mt-1 h-8 py-1.5 text-[10px]" /></label></div>{excluded.length ? <p className="mt-2 font-mono text-[9px] text-red-600">현재 제외: {excluded.map((item) => `#${item.tag}`).join(" · ")}</p> : <p className="mt-2 font-mono text-[9px] text-[#77797C]">현재 기준에서 자동 제외된 태그가 없습니다.</p>}</div><div className="mt-3 border border-[#1C1D21]/10 bg-white/75 p-3"><div className="flex items-center justify-between gap-3"><div><span className="font-mono text-[10px] font-semibold tracking-[0.08em]">통계 JSON</span><p className="mt-1 font-mono text-[9px] leading-4 text-[#77797C]">피드백·일자별 이력·제외 기준을 백업 파일로 저장합니다.</p></div><button onClick={exportAnalytics} className="tool-button shrink-0"><Download size={13} /> 내보내기</button></div></div><div className="mt-3 border border-[#1C1D21]/10 bg-white/75 p-3"><div className="flex items-center justify-between"><span className="font-mono text-[10px] font-semibold tracking-[0.08em]">최근 7일 피드백 추이</span><span className="font-mono text-[9px] text-[#77797C]">파랑 수락 · 주황 거절</span></div>{history.length ? <div className="mt-3 grid grid-cols-7 gap-1.5">{trend.map((day) => <div key={day.day} className="flex min-w-0 flex-col items-center"><div className="flex h-16 w-full items-end justify-center gap-1 bg-[#F4F1EA] px-1"><span className="w-2 bg-[#2563EB]" style={{ height: `${(day.accepted / trendMax) * 100}%` }} /><span className="w-2 bg-[#D97757]" style={{ height: `${(day.rejected / trendMax) * 100}%` }} /></div><span className="mt-1 font-mono text-[8px] text-[#77797C]">{day.day.slice(5).replace("-", "/")}</span></div>)}</div> : <div className="mt-3 border border-dashed border-[#1C1D21]/15 bg-[#F4F1EA] px-3 py-3 font-mono text-[9px] text-[#77797C]">오늘부터 수락·거절한 피드백의 일자별 변화가 막대 그래프로 표시됩니다.</div>}</div></div>;
+}
+
 export default function Home() {
   const [title, setTitle] = useState("연구소 업무 보조");
   const [notes, setNotes] = useState("");
@@ -286,6 +322,8 @@ export default function Home() {
   const [remoteSuggestedTags, setRemoteSuggestedTags] = useState<string[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [tagFeedback, setTagFeedback] = useState<TagFeedback>(readTagFeedback);
+  const [feedbackHistory, setFeedbackHistory] = useState<FeedbackEvent[]>(readFeedbackHistory);
+  const [exclusionSettings, setExclusionSettings] = useState<ExclusionSettings>(readExclusionSettings);
   const [dismissedTags, setDismissedTags] = useState<string[]>([]);
   const [backupPreview, setBackupPreview] = useState<BackupPreview | null>(null);
   const [backupMode, setBackupMode] = useState<"merge" | "replace">("merge");
@@ -296,8 +334,8 @@ export default function Home() {
   const source = sourceLines.length ? sourceLines : normalizeLines(EXAMPLE);
   const document = activeDocument === "start" ? createStartDocument(selectedProvider, title, source, detail) : createSkillDocument(selectedProvider, title, source, detail);
   const allTags = useMemo(() => Array.from(new Set([...library.flatMap((entry) => entry.tags), ...customTags])).sort((a, b) => a.localeCompare(b, "ko")), [library, customTags]);
-  const localSuggestedTags = useMemo(() => recommendTags(title, notes, selected, allTags, saveKind, tagFeedback).filter((tag) => !normalizeTags(tagInput).includes(tag)), [title, notes, selected, allTags, saveKind, tagInput, tagFeedback]);
-  const suggestedTags = (aiMode === "cheapai" && remoteSuggestedTags.length ? remoteSuggestedTags : localSuggestedTags).filter((tag) => !normalizeTags(tagInput).includes(tag) && !dismissedTags.includes(tag));
+  const localSuggestedTags = useMemo(() => recommendTags(title, notes, selected, allTags, saveKind, tagFeedback, exclusionSettings).filter((tag) => !normalizeTags(tagInput).includes(tag)), [title, notes, selected, allTags, saveKind, tagInput, tagFeedback, exclusionSettings]);
+  const suggestedTags = (aiMode === "cheapai" && remoteSuggestedTags.length ? remoteSuggestedTags : localSuggestedTags).filter((tag) => !normalizeTags(tagInput).includes(tag) && !dismissedTags.includes(tag) && !isTagExcluded(tag, tagFeedback, exclusionSettings));
   const estimatedInputTokens = Math.max(110, Math.ceil((title.length + notes.length + allTags.join(",").length + 420) / 2.5));
   const estimatedOutputTokens = 160;
   const estimatedKrw = ((estimatedInputTokens * MODEL_PRICING[aiModel].input) + (estimatedOutputTokens * MODEL_PRICING[aiModel].output)) / 1_000_000;
@@ -359,6 +397,11 @@ function updateCheapAiKey(value: string) {
   if (value.trim()) window.localStorage.setItem(CHEAPAI_KEY_STORAGE, value.trim()); else window.localStorage.removeItem(CHEAPAI_KEY_STORAGE);
 }
 
+function updateExclusionSettings(next: ExclusionSettings) {
+  setExclusionSettings(next);
+  window.localStorage.setItem(TAG_EXCLUSION_SETTINGS_KEY, JSON.stringify(next));
+}
+
   function saveToLibrary() {
     const name = saveName.trim();
     if (!name) { toast.message("저장할 항목의 이름을 적어 주세요."); return; }
@@ -378,7 +421,9 @@ function applySuggestedTag(tag: string) {
 function recordTagFeedback(tag: string, verdict: "accepted" | "rejected") {
   const next = { ...tagFeedback, [tag]: { accepted: tagFeedback[tag]?.accepted || 0, rejected: tagFeedback[tag]?.rejected || 0 } };
   next[tag][verdict] += 1;
-  setTagFeedback(next); window.localStorage.setItem(TAG_FEEDBACK_KEY, JSON.stringify(next));
+  const event: FeedbackEvent = { tag, verdict, at: new Date().toISOString() };
+  const history = [...feedbackHistory, event].slice(-500);
+  setTagFeedback(next); setFeedbackHistory(history); window.localStorage.setItem(TAG_FEEDBACK_KEY, JSON.stringify(next)); window.localStorage.setItem(TAG_FEEDBACK_HISTORY_KEY, JSON.stringify(history));
 }
 
 function rejectSuggestedTag(tag: string) {
@@ -417,6 +462,12 @@ function exportBackup() {
   const payload: BackupPayload = { schema: 1, exportedAt: new Date().toISOString(), library, customTags };
   downloadText(`prompt-folio-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2));
   toast.success("보관함과 태그 사전을 JSON 파일로 내보냈습니다.");
+}
+
+function exportAnalytics() {
+  const payload = { schema: 1, exportedAt: new Date().toISOString(), feedback: tagFeedback, feedbackHistory, exclusionSettings };
+  downloadText(`prompt-folio-feedback-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2));
+  toast.success("태그 추천 통계를 JSON 파일로 내보냈습니다.");
 }
 
 async function prepareBackupImport(file: File | undefined) {
@@ -470,7 +521,8 @@ function applyBackupImport() {
         <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} />
         <AssistantToolsPanel aiMode={aiMode} setAiMode={setAiMode} aiModel={aiModel} setAiModel={setAiModel} cheapAiKey={cheapAiKey} updateCheapAiKey={updateCheapAiKey} isSuggesting={isSuggesting} requestAiTags={requestAiTags} customTags={customTags} customTagInput={customTagInput} setCustomTagInput={setCustomTagInput} addCustomTag={addCustomTag} removeCustomTag={removeCustomTag} exportBackup={exportBackup} prepareBackupImport={prepareBackupImport} backupPreview={backupPreview} backupMode={backupMode} setBackupMode={setBackupMode} backupSelected={backupSelected} setBackupSelected={setBackupSelected} applyBackupImport={applyBackupImport} estimatedInputTokens={estimatedInputTokens} estimatedOutputTokens={estimatedOutputTokens} estimatedKrw={estimatedKrw} />
         <TagAnalyticsPanel feedback={tagFeedback} />
-        <div className="editor-card p-6 md:p-7"><div className="section-kicker"><span className="counter">06</span> COMPILE OPTIONS</div><div className="mt-5 grid gap-6 sm:grid-cols-2"><div><span className="field-label">압축 강도</span><div className="mt-2 grid grid-cols-3 border border-[#1C1D21]/15 p-1">{(["compact", "balanced", "detailed"] as DetailLevel[]).map((item) => <button key={item} onClick={() => setDetail(item)} className={`px-2 py-2 font-mono text-[10px] transition ${detail === item ? "bg-[#1C1D21] text-white" : "text-[#67696C] hover:bg-[#EEE9DF]"}`}>{item === "compact" ? "짧게" : item === "balanced" ? "균형" : "자세히"}</button>)}</div></div><div><span className="field-label">선택 서비스</span><div className="mt-2 flex flex-wrap gap-1.5">{PROVIDERS.map((provider) => <button key={provider.id} onClick={() => toggleProvider(provider.id)} className={`provider-check ${selected.includes(provider.id) ? "is-active" : ""}`} style={{ "--provider": provider.color } as CSSProperties}><span className="check-dot">{selected.includes(provider.id) && <Check size={10} strokeWidth={3} />}</span>{provider.label}</button>)}</div></div></div><button onClick={generate} className="generate-button mt-7 w-full"><Sparkles size={17} /> {selected.length}개 서비스용 Markdown 만들기 <ChevronRight size={17} /></button></div>
+        <FeedbackControlsPanel feedback={tagFeedback} history={feedbackHistory} settings={exclusionSettings} updateSettings={updateExclusionSettings} exportAnalytics={exportAnalytics} />
+        <div className="editor-card p-6 md:p-7"><div className="section-kicker"><span className="counter">07</span> COMPILE OPTIONS</div><div className="mt-5 grid gap-6 sm:grid-cols-2"><div><span className="field-label">압축 강도</span><div className="mt-2 grid grid-cols-3 border border-[#1C1D21]/15 p-1">{(["compact", "balanced", "detailed"] as DetailLevel[]).map((item) => <button key={item} onClick={() => setDetail(item)} className={`px-2 py-2 font-mono text-[10px] transition ${detail === item ? "bg-[#1C1D21] text-white" : "text-[#67696C] hover:bg-[#EEE9DF]"}`}>{item === "compact" ? "짧게" : item === "balanced" ? "균형" : "자세히"}</button>)}</div></div><div><span className="field-label">선택 서비스</span><div className="mt-2 flex flex-wrap gap-1.5">{PROVIDERS.map((provider) => <button key={provider.id} onClick={() => toggleProvider(provider.id)} className={`provider-check ${selected.includes(provider.id) ? "is-active" : ""}`} style={{ "--provider": provider.color } as CSSProperties}><span className="check-dot">{selected.includes(provider.id) && <Check size={10} strokeWidth={3} />}</span>{provider.label}</button>)}</div></div></div><button onClick={generate} className="generate-button mt-7 w-full"><Sparkles size={17} /> {selected.length}개 서비스용 Markdown 만들기 <ChevronRight size={17} /></button></div>
       </div>
       <div className="result-card min-h-[680px] overflow-hidden"><div className="result-topbar flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:px-7"><div><div className="section-kicker text-[#ABB7D5]"><span className="counter border-[#ABB7D5]/50 text-[#D7E2FF]">04</span> {hasGenerated ? "COMPILED OUTPUT" : "OUTPUT PREVIEW"}</div><h2 className="mt-2 font-serif text-2xl font-bold tracking-[-0.04em] text-white">{hasGenerated ? "복사하고 바로 사용하세요" : "정리된 문서가 이곳에 표시됩니다"}</h2></div><div className="flex gap-2"><button onClick={copyDocument} className="result-action"><Clipboard size={14} /> {copied ? "복사됨" : "복사"}</button><button onClick={() => downloadText(activeDocument === "start" ? selectedProvider.startFile : selectedProvider.skillFile, document)} className="result-action"><Download size={14} /> .md 저장</button></div></div>
         <div className="border-b border-white/10 bg-[#232A3C] px-5 pt-4 md:px-7"><div className="flex gap-1 overflow-x-auto pb-0">{selectedProviders.map((provider) => <button key={provider.id} onClick={() => setActiveProvider(provider.id)} className={`provider-tab ${activeProvider === provider.id ? "is-current" : ""}`}><span style={{ backgroundColor: provider.color }} />{provider.label}</button>)}</div></div>
