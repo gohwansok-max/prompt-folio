@@ -81,3 +81,18 @@
   .result-card { animation-delay: .06s; }
   @keyframes arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 }
+
+@media (max-width: 640px) {
+  #top { padding-left: .75rem !important; padding-right: .75rem !important; padding-top: 1rem !important; }
+  .hero-sheet { padding: 1.25rem !important; }
+  .editor-card, .result-card { box-shadow: 3px 3px 0 rgba(28,29,33,.08); }
+  .field-input { min-height: 42px; font-size: 16px; }
+  textarea.field-input { min-height: 200px !important; }
+  .provider-check { min-height: 34px; padding: .45rem .55rem; font-size: 10px; }
+  .generate-button { min-height: 50px; font-size: 11px; }
+  .tool-button, .result-action { min-height: 36px; font-size: 10px; }
+  .paper-preview { min-height: 360px; padding: 1rem; }
+  .markdown-output { font-size: 10px; line-height: 1.78; }
+  .analytics-metric { padding: .65rem; }
+  .analytics-metric strong { font-size: 1rem; }
+}
