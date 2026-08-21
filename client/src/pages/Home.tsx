@@ -15,6 +15,8 @@ type TagFeedback = Record<string, { accepted: number; rejected: number }>;
 type FeedbackEvent = { tag: string; verdict: "accepted" | "rejected"; at: string };
 type ExclusionSettings = { minObservations: number; rejectionRate: number };
 type TagGroup = { id: string; name: string; tags: string[] };
+type OptimizationIntensity = "moderate" | "strong";
+type OptimizationEvent = { at: string; rawTokens: number; optimizedTokens: number; savingsTokens: number; savingsKrw: number; intensity: OptimizationIntensity; tags: string[] };
 type BackupPreview = { fileName: string; library: SavedEntry[]; customTags: string[]; newCount: number; updateCount: number; sameCount: number };
 
 const PROVIDERS: Provider[] = [
@@ -38,6 +40,8 @@ const TAG_FEEDBACK_KEY = "prompt-folio-tag-feedback-v1";
 const TAG_FEEDBACK_HISTORY_KEY = "prompt-folio-tag-feedback-history-v1";
 const TAG_EXCLUSION_SETTINGS_KEY = "prompt-folio-tag-exclusion-settings-v1";
 const TAG_GROUPS_KEY = "prompt-folio-tag-groups-v1";
+const OPTIMIZATION_INTENSITY_KEY = "prompt-folio-optimization-intensity-v1";
+const OPTIMIZATION_HISTORY_KEY = "prompt-folio-optimization-history-v1";
 const DEFAULT_EXCLUSION_SETTINGS: ExclusionSettings = { minObservations: 3, rejectionRate: 70 };
 const MODEL_PRICING: Record<AiModel, { input: number; output: number }> = { "gpt-5.6-sol": { input: 7500, output: 45000 }, "claude-sonnet-5": { input: 4500, output: 22500 } };
 
@@ -70,6 +74,19 @@ function readTagGroups(): TagGroup[] {
   try {
     const value = JSON.parse(window.localStorage.getItem(TAG_GROUPS_KEY) || "[]");
     return Array.isArray(value) ? value.filter((item): item is TagGroup => Boolean(item && typeof item.id === "string" && typeof item.name === "string" && Array.isArray(item.tags))).map((item) => ({ ...item, tags: normalizeTags(item.tags.filter((tag): tag is string => typeof tag === "string").join(",")) })).filter((item) => item.name.trim() && item.tags.length) : [];
+  } catch { return []; }
+}
+
+function readOptimizationIntensity(): OptimizationIntensity {
+  if (typeof window === "undefined") return "moderate";
+  return window.localStorage.getItem(OPTIMIZATION_INTENSITY_KEY) === "strong" ? "strong" : "moderate";
+}
+
+function readOptimizationHistory(): OptimizationEvent[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const value = JSON.parse(window.localStorage.getItem(OPTIMIZATION_HISTORY_KEY) || "[]");
+    return Array.isArray(value) ? value.filter((item): item is OptimizationEvent => Boolean(item && typeof item.at === "string" && typeof item.rawTokens === "number" && typeof item.optimizedTokens === "number" && typeof item.savingsTokens === "number" && typeof item.savingsKrw === "number" && (item.intensity === "moderate" || item.intensity === "strong") && Array.isArray(item.tags))).slice(-300) : [];
   } catch { return []; }
 }
 
@@ -145,10 +162,12 @@ function normalizeLines(value: string) {
   return value.replace(/\r/g, "").split("\n").map((line) => line.replace(/^\s*[-•*]\s*/, "").trim()).filter(Boolean).filter((line, index, list) => list.indexOf(line) === index).slice(0, 14);
 }
 
-function optimizeForCheapAi(value: string) {
-  const filler = /(정말|매우|좀|가능하면|부탁드립니다|잘|충분히|자세하게|친절하게)/g;
+function optimizeForCheapAi(value: string, intensity: OptimizationIntensity) {
+  const filler = intensity === "strong" ? /(정말|매우|좀|가능하면|부탁드립니다|잘|충분히|자세하게|친절하게|기본적으로|일반적으로|가능한 한)/g : /(정말|매우|좀|가능하면|부탁드립니다|잘|충분히|자세하게|친절하게)/g;
   const sentences = value.replace(/\r/g, "").split(/[\n.!?]+/).map((line) => line.replace(/^\s*[-•*]\s*/, "").replace(filler, "").replace(/\s{2,}/g, " ").trim()).filter(Boolean);
-  return Array.from(new Set(sentences)).slice(0, 10).join("\n");
+  const unique = Array.from(new Set(sentences));
+  const max = intensity === "strong" ? 6 : 10;
+  return unique.slice(0, max).join(intensity === "strong" ? " · " : "\n");
 }
 
 function inferRules(lines: string[]) {
@@ -306,6 +325,22 @@ function PromptOptimizerPanel({ enabled, setEnabled, rawTokens, optimizedTokens,
   return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">06</span> CHEAPAI OPTIMIZER</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">전송 전 자동 압축</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><Sparkles size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">CheapAI 태그 추천 요청에서 중복 문장·불필요한 수식어를 줄여 입력 토큰을 절약합니다. 원문은 바꾸지 않습니다.</p><div className="mt-4 flex items-center justify-between border border-[#1C1D21]/10 bg-white/75 p-3"><div><span className="font-mono text-[10px] font-semibold tracking-[0.08em]">자동 최적화</span><p className="mt-1 font-mono text-[9px] text-[#77797C]">CheapAI 모델 모드에서만 API 전송 내용에 적용</p></div><button onClick={() => setEnabled(!enabled)} className={`optimizer-switch ${enabled ? "is-active" : ""}`} aria-label="자동 최적화 전환"><span /></button></div><div className="mt-3 grid grid-cols-3 gap-2"><div className="analytics-metric"><strong>{rawTokens}</strong><span>원문 토큰</span></div><div className="analytics-metric"><strong>{optimizedTokens}</strong><span>최적화 토큰</span></div><div className="analytics-metric"><strong>{savedRatio}%</strong><span>예상 절감률</span></div></div><div className="mt-3 flex items-center justify-between border border-[#2563EB]/20 bg-[#EFF4FF]/60 px-3 py-2 font-mono text-[10px] text-[#3564B9]"><span>예상 절감 {savingsTokens} tok · ₩{savingsKrw.toFixed(2)}</span><button onClick={applyOptimization} disabled={!optimizedPreview.trim() || optimizedPreview === ""} className="font-semibold underline underline-offset-2 hover:text-[#1D4ED8] disabled:opacity-40">편집기에 적용</button></div></div>;
 }
 
+function OptimizationIntensityPanel({ intensity, setIntensity }: { intensity: OptimizationIntensity; setIntensity: (value: OptimizationIntensity) => void }) {
+  return <div className="editor-card p-6 md:p-7"><div className="section-kicker"><span className="counter">07</span> QUALITY CONTROL</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">압축 강도 설정</h2><p className="mt-2 text-[12px] leading-5 text-[#66686C]">보통은 문장 구조를 최대한 보존하고, 강함은 중복·수식어를 더 줄여 CheapAI 입력 토큰을 낮춥니다.</p><div className="mt-5 grid grid-cols-2 border border-[#1C1D21]/15 p-1"><button onClick={() => setIntensity("moderate")} className={`px-3 py-3 text-left transition ${intensity === "moderate" ? "bg-[#1C1D21] text-white" : "text-[#67696C] hover:bg-[#F0ECE4]"}`}><span className="block font-mono text-[10px] font-semibold">보통</span><span className="mt-1 block font-mono text-[9px] leading-4 opacity-75">최대 10개 문장 보존</span></button><button onClick={() => setIntensity("strong")} className={`px-3 py-3 text-left transition ${intensity === "strong" ? "bg-[#2563EB] text-white" : "text-[#67696C] hover:bg-[#EFF4FF]"}`}><span className="block font-mono text-[10px] font-semibold">강함</span><span className="mt-1 block font-mono text-[9px] leading-4 opacity-75">핵심 6개 문장으로 압축</span></button></div><p className="mt-3 font-mono text-[9px] leading-5 text-[#77797C]">선택값은 이 브라우저에 저장되며 CheapAI 태그 추천 요청에 자동 적용됩니다.</p></div>;
+}
+
+function WeeklySavingsReport({ history, library }: { history: OptimizationEvent[]; library: SavedEntry[] }) {
+  const start = new Date(); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0);
+  const recent = history.filter((item) => new Date(item.at) >= start);
+  const tagCounts = new Map<string, number>();
+  recent.forEach((item) => item.tags.forEach((tag) => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)));
+  library.filter((item) => new Date(item.savedAt) >= start).forEach((item) => item.tags.forEach((tag) => tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)));
+  const topTags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko")).slice(0, 5);
+  const savingsTokens = recent.reduce((sum, item) => sum + item.savingsTokens, 0);
+  const savingsKrw = recent.reduce((sum, item) => sum + item.savingsKrw, 0);
+  return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">08</span> WEEKLY REPORT</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">이번 주 태그·비용 절감</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><BarChart3 size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">최근 7일의 저장 프롬프트와 성공한 CheapAI 추천 이력을 열 때마다 자동 집계합니다.</p>{recent.length || topTags.length ? <><div className="mt-5 grid grid-cols-3 gap-2"><div className="analytics-metric"><strong>{recent.length}</strong><span>CheapAI 분석</span></div><div className="analytics-metric"><strong>{savingsTokens}</strong><span>절감 토큰</span></div><div className="analytics-metric"><strong>₩{savingsKrw.toFixed(2)}</strong><span>예상 절감</span></div></div><div className="mt-4 border border-[#1C1D21]/10 bg-white/75 p-3"><div className="font-mono text-[10px] font-semibold tracking-[0.08em]">가장 많이 사용된 태그</div><div className="mt-3 flex flex-wrap gap-1.5">{topTags.map(([tag, count]) => <span key={tag} className="dictionary-tag">#{tag}<b className="ml-1 font-normal text-[#6D6F74]">{count}</b></span>)}</div></div></> : <div className="mt-5 border border-dashed border-[#1C1D21]/15 bg-[#F0ECE4] px-4 py-5 font-mono text-[10px] leading-5 text-[#77797C]">CheapAI 추천을 실행하거나 태그를 붙여 프롬프트를 저장하면 이번 주 리포트가 자동으로 채워집니다.</div>}</div>;
+}
+
 function TagAnalyticsPanel({ feedback }: { feedback: TagFeedback }) {
   const rows = Object.entries(feedback).map(([tag, value]) => ({ tag, ...value, total: value.accepted + value.rejected })).filter((item) => item.total > 0).sort((a, b) => b.total - a.total || b.accepted - a.accepted).slice(0, 6);
   const accepted = rows.reduce((sum, item) => sum + item.accepted, 0);
@@ -362,6 +397,8 @@ export default function Home() {
   const [aiMode, setAiMode] = useState<AiMode>("local");
   const [aiModel, setAiModel] = useState<AiModel>("gpt-5.6-sol");
   const [optimizeBeforeSend, setOptimizeBeforeSend] = useState(true);
+  const [optimizationIntensity, setOptimizationIntensity] = useState<OptimizationIntensity>(readOptimizationIntensity);
+  const [optimizationHistory, setOptimizationHistory] = useState<OptimizationEvent[]>(readOptimizationHistory);
   const [cheapAiKey, setCheapAiKey] = useState(readCheapAiKey);
   const [remoteSuggestedTags, setRemoteSuggestedTags] = useState<string[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -380,7 +417,7 @@ export default function Home() {
   const allTags = useMemo(() => Array.from(new Set([...library.flatMap((entry) => entry.tags), ...customTags])).sort((a, b) => a.localeCompare(b, "ko")), [library, customTags]);
   const localSuggestedTags = useMemo(() => recommendTags(title, notes, selected, allTags, saveKind, tagFeedback, exclusionSettings).filter((tag) => !normalizeTags(tagInput).includes(tag)), [title, notes, selected, allTags, saveKind, tagInput, tagFeedback, exclusionSettings]);
   const suggestedTags = (aiMode === "cheapai" && remoteSuggestedTags.length ? remoteSuggestedTags : localSuggestedTags).filter((tag) => !normalizeTags(tagInput).includes(tag) && !dismissedTags.includes(tag) && !isTagExcluded(tag, tagFeedback, exclusionSettings));
-  const optimizedNotes = useMemo(() => optimizeForCheapAi(notes), [notes]);
+  const optimizedNotes = useMemo(() => optimizeForCheapAi(notes, optimizationIntensity), [notes, optimizationIntensity]);
   const rawInputTokens = Math.max(110, Math.ceil((title.length + notes.length + allTags.join(",").length + 420) / 2.5));
   const estimatedInputTokens = Math.max(110, Math.ceil((title.length + (optimizeBeforeSend ? optimizedNotes : notes).length + allTags.join(",").length + 420) / 2.5));
   const estimatedOutputTokens = 160;
@@ -453,6 +490,17 @@ function updateCheapAiKey(value: string) {
 function updateExclusionSettings(next: ExclusionSettings) {
   setExclusionSettings(next);
   window.localStorage.setItem(TAG_EXCLUSION_SETTINGS_KEY, JSON.stringify(next));
+}
+
+function updateOptimizationIntensity(next: OptimizationIntensity) {
+  setOptimizationIntensity(next);
+  window.localStorage.setItem(OPTIMIZATION_INTENSITY_KEY, next);
+}
+
+function recordOptimizationEvent() {
+  const event: OptimizationEvent = { at: new Date().toISOString(), rawTokens: rawInputTokens, optimizedTokens: estimatedInputTokens, savingsTokens: estimatedSavingsTokens, savingsKrw: estimatedSavingsKrw, intensity: optimizationIntensity, tags: normalizeTags(tagInput) };
+  const next = [...optimizationHistory, event].slice(-300);
+  setOptimizationHistory(next); window.localStorage.setItem(OPTIMIZATION_HISTORY_KEY, JSON.stringify(next));
 }
 
 function applyPromptOptimization() {
@@ -532,7 +580,7 @@ async function requestAiTags() {
     if (!response.ok) throw new Error(typeof data?.error?.message === "string" ? data.error.message : `API 오류 (${response.status})`);
     const tags = extractAiTags(String(data?.choices?.[0]?.message?.content || ""));
     if (!tags.length) throw new Error("태그 배열을 읽지 못했습니다.");
-    setRemoteSuggestedTags(tags); toast.success(`${aiModel.startsWith("claude") ? "Claude" : "ChatGPT"}가 ${tags.length}개 태그를 추천했습니다.`);
+    setRemoteSuggestedTags(tags); recordOptimizationEvent(); toast.success(`${aiModel.startsWith("claude") ? "Claude" : "ChatGPT"}가 ${tags.length}개 태그를 추천했습니다.`);
   } catch (error) { toast.error(error instanceof Error ? error.message : "AI 추천에 실패했습니다.", { description: "브라우저 CORS 또는 API 키·크레딧 상태를 확인해 주세요." }); }
   finally { setIsSuggesting(false); }
 }
@@ -601,6 +649,8 @@ function applyBackupImport() {
         <AssistantToolsPanel aiMode={aiMode} setAiMode={setAiMode} aiModel={aiModel} setAiModel={setAiModel} cheapAiKey={cheapAiKey} updateCheapAiKey={updateCheapAiKey} isSuggesting={isSuggesting} requestAiTags={requestAiTags} customTags={customTags} customTagInput={customTagInput} setCustomTagInput={setCustomTagInput} addCustomTag={addCustomTag} removeCustomTag={removeCustomTag} exportBackup={exportBackup} prepareBackupImport={prepareBackupImport} backupPreview={backupPreview} backupMode={backupMode} setBackupMode={setBackupMode} backupSelected={backupSelected} setBackupSelected={setBackupSelected} applyBackupImport={applyBackupImport} estimatedInputTokens={estimatedInputTokens} estimatedOutputTokens={estimatedOutputTokens} estimatedKrw={estimatedKrw} />
         <TagGroupsPanel groups={tagGroups} name={tagGroupName} setName={setTagGroupName} tags={tagGroupInput} setTags={setTagGroupInput} saveGroup={saveTagGroup} applyGroup={applyTagGroup} deleteGroup={deleteTagGroup} />
         <PromptOptimizerPanel enabled={optimizeBeforeSend} setEnabled={setOptimizeBeforeSend} rawTokens={rawInputTokens} optimizedTokens={estimatedInputTokens} savingsTokens={estimatedSavingsTokens} savingsKrw={estimatedSavingsKrw} optimizedPreview={optimizedNotes} applyOptimization={applyPromptOptimization} />
+        <OptimizationIntensityPanel intensity={optimizationIntensity} setIntensity={updateOptimizationIntensity} />
+        <WeeklySavingsReport history={optimizationHistory} library={library} />
         <TagWordCloudPanel library={library} customTags={customTags} feedback={tagFeedback} />
         <TagAnalyticsPanel feedback={tagFeedback} />
         <FeedbackControlsPanel feedback={tagFeedback} history={feedbackHistory} settings={exclusionSettings} updateSettings={updateExclusionSettings} exportAnalytics={exportAnalytics} />
