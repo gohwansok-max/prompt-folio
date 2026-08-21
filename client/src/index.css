@@ -71,6 +71,9 @@
   #top .result-card button.bg-\[\#2563EB\] { background-color: #1C1D21; }
   #top .result-card button.bg-\[\#2563EB\]:hover { background-color: #34363B; }
   .markdown-output { @apply m-0 mt-5 whitespace-pre-wrap break-words font-mono text-[11px] leading-[1.85] text-[#34363B]; }
+  .analytics-metric { @apply flex min-w-0 flex-col gap-1 border border-[#1C1D21]/10 bg-[#F7F4ED] p-2.5 font-mono text-[#2563EB]; }
+  .analytics-metric strong { @apply text-lg leading-none text-[#24262B]; }
+  .analytics-metric span { @apply text-[8px] text-[#75777B]; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
