@@ -81,6 +81,10 @@
   .tag-word.low { color: #C75A45; }
   .tag-word.neutral { color: #7A7C80; }
   .theme-toggle { @apply inline-flex h-9 items-center gap-1.5 border border-[#1C1D21]/15 bg-white px-2.5 font-mono text-[10px] font-semibold transition hover:border-[#2563EB] hover:text-[#2563EB] active:scale-[0.97]; }
+  .optimizer-switch { @apply relative h-6 w-11 rounded-full bg-[#BFC3C8] p-1 transition active:scale-[0.97]; }
+  .optimizer-switch span { @apply block h-4 w-4 rounded-full bg-white shadow-sm transition-transform; }
+  .optimizer-switch.is-active { @apply bg-[#2563EB]; }
+  .optimizer-switch.is-active span { transform: translateX(20px); }
 }
 
 .dark body, .dark #root { background: #12161F; color: #E8EBF1; }
@@ -94,6 +98,8 @@
 .dark .analytics-metric, .dark .editor-card .bg-\[\#F4F1EA\], .dark .editor-card .bg-\[\#F0ECE4\] { background-color: #232B3C !important; border-color: rgba(232,235,241,.12) !important; }
 .dark .analytics-metric strong, .dark .analytics-metric span { color: #E8EBF1 !important; }
 .dark .tag-word.neutral { color: #BBC3D3; }
+.dark .optimizer-switch { background-color: #546176; }
+.dark .optimizer-switch.is-active { background-color: #4F8BFF; }
 .dark footer { border-color: rgba(232,235,241,.12) !important; }
 
 @media (prefers-reduced-motion: no-preference) {

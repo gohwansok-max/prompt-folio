@@ -14,6 +14,7 @@ type BackupPayload = { schema: 1; exportedAt: string; library: SavedEntry[]; cus
 type TagFeedback = Record<string, { accepted: number; rejected: number }>;
 type FeedbackEvent = { tag: string; verdict: "accepted" | "rejected"; at: string };
 type ExclusionSettings = { minObservations: number; rejectionRate: number };
+type TagGroup = { id: string; name: string; tags: string[] };
 type BackupPreview = { fileName: string; library: SavedEntry[]; customTags: string[]; newCount: number; updateCount: number; sameCount: number };
 
 const PROVIDERS: Provider[] = [
@@ -36,6 +37,7 @@ const CHEAPAI_BASE_URL = "https://api.cheapai.im/v1";
 const TAG_FEEDBACK_KEY = "prompt-folio-tag-feedback-v1";
 const TAG_FEEDBACK_HISTORY_KEY = "prompt-folio-tag-feedback-history-v1";
 const TAG_EXCLUSION_SETTINGS_KEY = "prompt-folio-tag-exclusion-settings-v1";
+const TAG_GROUPS_KEY = "prompt-folio-tag-groups-v1";
 const DEFAULT_EXCLUSION_SETTINGS: ExclusionSettings = { minObservations: 3, rejectionRate: 70 };
 const MODEL_PRICING: Record<AiModel, { input: number; output: number }> = { "gpt-5.6-sol": { input: 7500, output: 45000 }, "claude-sonnet-5": { input: 4500, output: 22500 } };
 
@@ -61,6 +63,14 @@ function readLibrary(): SavedEntry[] {
 function readCustomTags() {
   if (typeof window === "undefined") return [];
   try { return normalizeTags(String(window.localStorage.getItem(CUSTOM_TAGS_KEY) || "")); } catch { return []; }
+}
+
+function readTagGroups(): TagGroup[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const value = JSON.parse(window.localStorage.getItem(TAG_GROUPS_KEY) || "[]");
+    return Array.isArray(value) ? value.filter((item): item is TagGroup => Boolean(item && typeof item.id === "string" && typeof item.name === "string" && Array.isArray(item.tags))).map((item) => ({ ...item, tags: normalizeTags(item.tags.filter((tag): tag is string => typeof tag === "string").join(",")) })).filter((item) => item.name.trim() && item.tags.length) : [];
+  } catch { return []; }
 }
 
 function readCheapAiKey() {
@@ -133,6 +143,12 @@ function recommendTags(title: string, notes: string, selected: ProviderId[], sav
 
 function normalizeLines(value: string) {
   return value.replace(/\r/g, "").split("\n").map((line) => line.replace(/^\s*[-•*]\s*/, "").trim()).filter(Boolean).filter((line, index, list) => list.indexOf(line) === index).slice(0, 14);
+}
+
+function optimizeForCheapAi(value: string) {
+  const filler = /(정말|매우|좀|가능하면|부탁드립니다|잘|충분히|자세하게|친절하게)/g;
+  const sentences = value.replace(/\r/g, "").split(/[\n.!?]+/).map((line) => line.replace(/^\s*[-•*]\s*/, "").replace(filler, "").replace(/\s{2,}/g, " ").trim()).filter(Boolean);
+  return Array.from(new Set(sentences)).slice(0, 10).join("\n");
 }
 
 function inferRules(lines: string[]) {
@@ -281,6 +297,15 @@ function AssistantToolsPanel(props: AssistantToolsProps) {
   </div>;
 }
 
+function TagGroupsPanel({ groups, name, setName, tags, setTags, saveGroup, applyGroup, deleteGroup }: { groups: TagGroup[]; name: string; setName: (value: string) => void; tags: string; setTags: (value: string) => void; saveGroup: () => void; applyGroup: (group: TagGroup) => void; deleteGroup: (id: string) => void }) {
+  return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">05</span> TAG GROUPS</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">자주 쓰는 태그 묶음</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><Layers3 size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">업무·프로젝트별 태그를 묶어 두면 현재 입력란에 한 번에 적용할 수 있습니다.</p><div className="mt-5 grid gap-2 sm:grid-cols-[.8fr_1.2fr_auto]"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 식품 QC" className="field-input h-9 py-1.5 text-[11px]" /><input value={tags} onChange={(event) => setTags(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveGroup(); }} placeholder="품질관리, HACCP, 미생물" className="field-input h-9 py-1.5 text-[11px]" /><button onClick={saveGroup} className="inline-flex h-9 items-center justify-center gap-1 bg-[#1C1D21] px-3 font-mono text-[10px] font-semibold text-white transition hover:bg-[#2563EB]"><Plus size={13} /> 그룹 저장</button></div>{groups.length ? <div className="mt-4 space-y-2">{groups.map((group) => <div key={group.id} className="flex items-center justify-between gap-2 border border-[#1C1D21]/10 bg-white/75 p-2"><button onClick={() => applyGroup(group)} className="min-w-0 flex-1 text-left"><span className="block text-[12px] font-semibold text-[#292B30]">{group.name}</span><span className="mt-1 block truncate font-mono text-[9px] text-[#6D6F74]">{group.tags.map((tag) => `#${tag}`).join(" · ")}</span></button><button onClick={() => applyGroup(group)} className="tool-button shrink-0">적용</button><button onClick={() => deleteGroup(group.id)} aria-label={`${group.name} 그룹 삭제`} className="flex h-8 w-8 shrink-0 items-center justify-center border border-[#1C1D21]/10 text-[#85878A] transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /></button></div>)}</div> : <div className="mt-4 border border-dashed border-[#1C1D21]/15 bg-[#F0ECE4] px-3 py-4 font-mono text-[9px] text-[#77797C]">예: “식품 QC”에 품질관리, HACCP, 미생물을 묶어 저장해 보세요.</div>}</div>;
+}
+
+function PromptOptimizerPanel({ enabled, setEnabled, rawTokens, optimizedTokens, savingsTokens, savingsKrw, optimizedPreview, applyOptimization }: { enabled: boolean; setEnabled: (value: boolean) => void; rawTokens: number; optimizedTokens: number; savingsTokens: number; savingsKrw: number; optimizedPreview: string; applyOptimization: () => void }) {
+  const savedRatio = rawTokens ? Math.round((savingsTokens / rawTokens) * 100) : 0;
+  return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">06</span> CHEAPAI OPTIMIZER</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">전송 전 자동 압축</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><Sparkles size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">CheapAI 태그 추천 요청에서 중복 문장·불필요한 수식어를 줄여 입력 토큰을 절약합니다. 원문은 바꾸지 않습니다.</p><div className="mt-4 flex items-center justify-between border border-[#1C1D21]/10 bg-white/75 p-3"><div><span className="font-mono text-[10px] font-semibold tracking-[0.08em]">자동 최적화</span><p className="mt-1 font-mono text-[9px] text-[#77797C]">CheapAI 모델 모드에서만 API 전송 내용에 적용</p></div><button onClick={() => setEnabled(!enabled)} className={`optimizer-switch ${enabled ? "is-active" : ""}`} aria-label="자동 최적화 전환"><span /></button></div><div className="mt-3 grid grid-cols-3 gap-2"><div className="analytics-metric"><strong>{rawTokens}</strong><span>원문 토큰</span></div><div className="analytics-metric"><strong>{optimizedTokens}</strong><span>최적화 토큰</span></div><div className="analytics-metric"><strong>{savedRatio}%</strong><span>예상 절감률</span></div></div><div className="mt-3 flex items-center justify-between border border-[#2563EB]/20 bg-[#EFF4FF]/60 px-3 py-2 font-mono text-[10px] text-[#3564B9]"><span>예상 절감 {savingsTokens} tok · ₩{savingsKrw.toFixed(2)}</span><button onClick={applyOptimization} disabled={!optimizedPreview.trim() || optimizedPreview === ""} className="font-semibold underline underline-offset-2 hover:text-[#1D4ED8] disabled:opacity-40">편집기에 적용</button></div></div>;
+}
+
 function TagAnalyticsPanel({ feedback }: { feedback: TagFeedback }) {
   const rows = Object.entries(feedback).map(([tag, value]) => ({ tag, ...value, total: value.accepted + value.rejected })).filter((item) => item.total > 0).sort((a, b) => b.total - a.total || b.accepted - a.accepted).slice(0, 6);
   const accepted = rows.reduce((sum, item) => sum + item.accepted, 0);
@@ -331,8 +356,12 @@ export default function Home() {
   const [tagFilter, setTagFilter] = useState("all");
   const [customTags, setCustomTags] = useState<string[]>(readCustomTags);
   const [customTagInput, setCustomTagInput] = useState("");
+  const [tagGroups, setTagGroups] = useState<TagGroup[]>(readTagGroups);
+  const [tagGroupName, setTagGroupName] = useState("");
+  const [tagGroupInput, setTagGroupInput] = useState("");
   const [aiMode, setAiMode] = useState<AiMode>("local");
   const [aiModel, setAiModel] = useState<AiModel>("gpt-5.6-sol");
+  const [optimizeBeforeSend, setOptimizeBeforeSend] = useState(true);
   const [cheapAiKey, setCheapAiKey] = useState(readCheapAiKey);
   const [remoteSuggestedTags, setRemoteSuggestedTags] = useState<string[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -351,9 +380,13 @@ export default function Home() {
   const allTags = useMemo(() => Array.from(new Set([...library.flatMap((entry) => entry.tags), ...customTags])).sort((a, b) => a.localeCompare(b, "ko")), [library, customTags]);
   const localSuggestedTags = useMemo(() => recommendTags(title, notes, selected, allTags, saveKind, tagFeedback, exclusionSettings).filter((tag) => !normalizeTags(tagInput).includes(tag)), [title, notes, selected, allTags, saveKind, tagInput, tagFeedback, exclusionSettings]);
   const suggestedTags = (aiMode === "cheapai" && remoteSuggestedTags.length ? remoteSuggestedTags : localSuggestedTags).filter((tag) => !normalizeTags(tagInput).includes(tag) && !dismissedTags.includes(tag) && !isTagExcluded(tag, tagFeedback, exclusionSettings));
-  const estimatedInputTokens = Math.max(110, Math.ceil((title.length + notes.length + allTags.join(",").length + 420) / 2.5));
+  const optimizedNotes = useMemo(() => optimizeForCheapAi(notes), [notes]);
+  const rawInputTokens = Math.max(110, Math.ceil((title.length + notes.length + allTags.join(",").length + 420) / 2.5));
+  const estimatedInputTokens = Math.max(110, Math.ceil((title.length + (optimizeBeforeSend ? optimizedNotes : notes).length + allTags.join(",").length + 420) / 2.5));
   const estimatedOutputTokens = 160;
   const estimatedKrw = ((estimatedInputTokens * MODEL_PRICING[aiModel].input) + (estimatedOutputTokens * MODEL_PRICING[aiModel].output)) / 1_000_000;
+  const estimatedSavingsTokens = Math.max(0, rawInputTokens - estimatedInputTokens);
+  const estimatedSavingsKrw = (estimatedSavingsTokens * MODEL_PRICING[aiModel].input) / 1_000_000;
   const filteredLibrary = useMemo(() => {
     const keyword = libraryQuery.trim().toLocaleLowerCase();
     return library.filter((entry) => {
@@ -407,6 +440,11 @@ function updateCustomTags(next: string[]) {
   window.localStorage.setItem(CUSTOM_TAGS_KEY, normalized.join(","));
 }
 
+function updateTagGroups(next: TagGroup[]) {
+  setTagGroups(next);
+  window.localStorage.setItem(TAG_GROUPS_KEY, JSON.stringify(next));
+}
+
 function updateCheapAiKey(value: string) {
   setCheapAiKey(value);
   if (value.trim()) window.localStorage.setItem(CHEAPAI_KEY_STORAGE, value.trim()); else window.localStorage.removeItem(CHEAPAI_KEY_STORAGE);
@@ -415,6 +453,12 @@ function updateCheapAiKey(value: string) {
 function updateExclusionSettings(next: ExclusionSettings) {
   setExclusionSettings(next);
   window.localStorage.setItem(TAG_EXCLUSION_SETTINGS_KEY, JSON.stringify(next));
+}
+
+function applyPromptOptimization() {
+  if (!optimizedNotes.trim()) { toast.message("최적화할 메모를 먼저 적어 주세요."); return; }
+  if (optimizedNotes === notes) { toast.message("현재 메모는 더 줄일 중복 표현이 없습니다."); return; }
+  setNotes(optimizedNotes); toast.success("압축한 메모를 편집기에 적용했습니다.");
 }
 
   function saveToLibrary() {
@@ -456,13 +500,33 @@ function removeCustomTag(tag: string) {
   updateCustomTags(customTags.filter((item) => item !== tag));
 }
 
+function saveTagGroup() {
+  const name = tagGroupName.trim();
+  const tags = normalizeTags(tagGroupInput);
+  if (!name || !tags.length) { toast.message("그룹 이름과 태그를 모두 입력해 주세요."); return; }
+  const group: TagGroup = { id: `${Date.now()}`, name, tags };
+  const existing = tagGroups.findIndex((item) => item.name === name);
+  updateTagGroups(existing >= 0 ? tagGroups.map((item, index) => index === existing ? group : item) : [group, ...tagGroups]);
+  updateCustomTags([...customTags, ...tags]); setTagGroupName(""); setTagGroupInput(""); toast.success(`“${name}” 그룹을 저장했습니다.`);
+}
+
+function applyTagGroup(group: TagGroup) {
+  const next = normalizeTags([tagInput, ...group.tags].filter(Boolean).join(","));
+  setTagInput(next.join(", ")); toast.success(`“${group.name}” 태그 ${group.tags.length}개를 적용했습니다.`);
+}
+
+function deleteTagGroup(id: string) {
+  updateTagGroups(tagGroups.filter((group) => group.id !== id));
+}
+
 async function requestAiTags() {
   if (!notes.trim()) { toast.message("추천할 메모를 먼저 적어 주세요."); return; }
   if (!cheapAiKey.trim()) { toast.message("CheapAI API 키를 입력해 주세요."); return; }
   setIsSuggesting(true);
   try {
     const feedbackText = Object.entries(tagFeedback).map(([tag, value]) => `${tag}: 수락 ${value.accepted}, 거절 ${value.rejected}`).join(" | ");
-    const prompt = `다음 입력을 분석해 저장용 한국어 태그 3~6개를 추천해라. 태그는 짧고 구체적으로, 중복 없이 작성한다. 사용자가 자주 거절한 태그는 피하고 자주 수락한 태그를 우선한다. 설명·코드블록 없이 JSON 문자열 배열만 반환한다.\n\n문서 이름: ${title}\n저장 유형: ${saveKind === "profile" ? "사용자 프로필" : "프롬프트 설정"}\n선택 서비스: ${selected.join(", ")}\n기존 태그: ${allTags.join(", ")}\n태그 피드백: ${feedbackText || "없음"}\n입력 메모:\n${notes}`;
+    const promptNotes = optimizeBeforeSend ? optimizedNotes : notes;
+    const prompt = `다음 입력을 분석해 저장용 한국어 태그 3~6개를 추천해라. 태그는 짧고 구체적으로, 중복 없이 작성한다. 사용자가 자주 거절한 태그는 피하고 자주 수락한 태그를 우선한다. 설명·코드블록 없이 JSON 문자열 배열만 반환한다.\n\n문서 이름: ${title}\n저장 유형: ${saveKind === "profile" ? "사용자 프로필" : "프롬프트 설정"}\n선택 서비스: ${selected.join(", ")}\n기존 태그: ${allTags.join(", ")}\n태그 피드백: ${feedbackText || "없음"}\n입력 메모:\n${promptNotes}`;
     const response = await fetch(`${CHEAPAI_BASE_URL}/chat/completions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${cheapAiKey.trim()}` }, body: JSON.stringify({ model: aiModel, messages: [{ role: "system", content: "You return only a JSON array of concise Korean tags." }, { role: "user", content: prompt }], temperature: 0.2, max_tokens: 160 }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(typeof data?.error?.message === "string" ? data.error.message : `API 오류 (${response.status})`);
@@ -535,6 +599,8 @@ function applyBackupImport() {
         </div>
         <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} />
         <AssistantToolsPanel aiMode={aiMode} setAiMode={setAiMode} aiModel={aiModel} setAiModel={setAiModel} cheapAiKey={cheapAiKey} updateCheapAiKey={updateCheapAiKey} isSuggesting={isSuggesting} requestAiTags={requestAiTags} customTags={customTags} customTagInput={customTagInput} setCustomTagInput={setCustomTagInput} addCustomTag={addCustomTag} removeCustomTag={removeCustomTag} exportBackup={exportBackup} prepareBackupImport={prepareBackupImport} backupPreview={backupPreview} backupMode={backupMode} setBackupMode={setBackupMode} backupSelected={backupSelected} setBackupSelected={setBackupSelected} applyBackupImport={applyBackupImport} estimatedInputTokens={estimatedInputTokens} estimatedOutputTokens={estimatedOutputTokens} estimatedKrw={estimatedKrw} />
+        <TagGroupsPanel groups={tagGroups} name={tagGroupName} setName={setTagGroupName} tags={tagGroupInput} setTags={setTagGroupInput} saveGroup={saveTagGroup} applyGroup={applyTagGroup} deleteGroup={deleteTagGroup} />
+        <PromptOptimizerPanel enabled={optimizeBeforeSend} setEnabled={setOptimizeBeforeSend} rawTokens={rawInputTokens} optimizedTokens={estimatedInputTokens} savingsTokens={estimatedSavingsTokens} savingsKrw={estimatedSavingsKrw} optimizedPreview={optimizedNotes} applyOptimization={applyPromptOptimization} />
         <TagWordCloudPanel library={library} customTags={customTags} feedback={tagFeedback} />
         <TagAnalyticsPanel feedback={tagFeedback} />
         <FeedbackControlsPanel feedback={tagFeedback} history={feedbackHistory} settings={exclusionSettings} updateSettings={updateExclusionSettings} exportAnalytics={exportAnalytics} />
