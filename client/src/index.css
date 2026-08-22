@@ -187,12 +187,12 @@
   .live-quality-next strong { @apply mt-1 block text-[12px] text-[#353840]; }
   .live-quality-next p { @apply mt-1 text-[10px] leading-4 text-[#72757A]; }
   .live-quality-next em { @apply mt-2 inline-block font-mono text-[9px] not-italic text-[#456FC4]; }
-  .prompt-enhance-action { @apply mt-3 flex flex-col gap-3 border border-[#2563EB]/25 bg-[#EFF4FF]/70 p-3 sm:flex-row sm:items-center sm:justify-between; }
+  .prompt-enhance-action { @apply mt-3 flex flex-col gap-3 border border-[#2563EB]/25 bg-[#EFF4FF]/70 p-3 sm:flex-row sm:items-center sm:justify-between; content-visibility: auto; contain-intrinsic-size: auto 110px; }
   .prompt-enhance-action strong { @apply mt-1 block text-[12px] text-[#2B3C60]; }
   .prompt-enhance-action p { @apply mt-1 text-[10px] leading-4 text-[#5F6F8E]; }
   .enhance-score { @apply mt-2 inline-block font-mono text-[9px] font-semibold text-[#2563EB]; }
   .prompt-enhance-actions { @apply flex shrink-0 gap-1.5; }
-  .prompt-enhance-actions button { @apply inline-flex min-h-9 items-center justify-center gap-1.5 bg-[#2563EB] px-3 font-mono text-[10px] font-semibold text-white transition hover:bg-[#1D4ED8] active:scale-[0.97]; }
+  .prompt-enhance-actions button { @apply inline-flex min-h-9 items-center justify-center gap-1.5 bg-[#2563EB] px-3 font-mono text-[10px] font-semibold text-white transition hover:bg-[#1D4ED8] active:scale-[0.97] disabled:cursor-wait disabled:opacity-75; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition-duration: 140ms; }
   .prompt-enhance-actions .enhance-undo { @apply border border-[#2563EB]/30 bg-white text-[#2563EB] hover:bg-[#EFF4FF]; }
   .advanced-nudge { @apply flex flex-col gap-2 border border-dashed border-[#1C1D21]/20 bg-[#F0ECE4]/70 px-4 py-3 text-[11px] text-[#62646A] sm:flex-row sm:items-center sm:justify-between; }
   .advanced-nudge span { @apply inline-flex items-center gap-2; }
@@ -364,7 +364,7 @@
   .live-quality-score strong { font-size: 1.55rem; }
   .live-quality-criteria { gap: .25rem; }
   .live-quality-criteria > span { padding: .3rem .4rem; font-size: 8px; }
-  .prompt-enhance-action { padding: .75rem; }
-  .prompt-enhance-actions { width: 100%; }
-  .prompt-enhance-actions button { flex: 1; }
+  .prompt-enhance-action { gap: .85rem; padding: .875rem; }
+  .prompt-enhance-actions { display: grid; width: 100%; grid-template-columns: 1fr; gap: .5rem; }
+  .prompt-enhance-actions button { min-height: 48px; width: 100%; font-size: 11px; }
 }
