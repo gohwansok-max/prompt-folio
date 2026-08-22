@@ -23,6 +23,8 @@ type ConflictDecision = "keep-local" | "use-backup" | "merge-tags";
 type BackupConflict = { key: string; local: SavedEntry; incoming: SavedEntry };
 type BackupPreview = { fileName: string; library: SavedEntry[]; customTags: string[]; newCount: number; updateCount: number; sameCount: number; conflicts: BackupConflict[] };
 type PromptTemplate = { id: string; category: string; title: string; summary: string; tags: string[]; notes: string };
+type PromptSuggestion = { id: string; label: string; detail: string; addition: string };
+type PromptReview = { score: number; checks: { label: string; ready: boolean; hint: string }[]; suggestions: PromptSuggestion[] };
 
 const PROVIDERS: Provider[] = [
   { id: "claude", label: "Claude", color: "#D97757", startFile: "CLAUDE.md", skillFile: "SKILL.md", focus: "명확한 작업 원칙" },
@@ -214,6 +216,29 @@ function optimizeForCheapAi(value: string, intensity: OptimizationIntensity): Op
   return { text, protectedRules: selected.filter((item) => item.protectedRule).length, mergedSentences, removedFillers };
 }
 
+function reviewPrompt(title: string, notes: string): PromptReview {
+  const source = `${title} ${notes}`.toLocaleLowerCase();
+  const hasPurpose = notes.trim().length >= 35 && /(작성|정리|분석|조사|설명|만들|도우미|요약|계획|답변)/.test(source);
+  const hasAudience = /(대상|독자|사용자|고객|초보|팀원|시청자|담당자)/.test(source);
+  const hasFormat = /(표|체크리스트|markdown|마크다운|형식|제목|불릿|단계|순서|목록)/.test(source);
+  const hasConstraint = /(반드시|금지|피하|확인|근거|불확실|사실|제한|주의)/.test(source);
+  const hasCompletion = /(완성|기준|다음 행동|확인 항목|결론|요약)/.test(source);
+  const checks = [
+    { label: "무엇을 할지", ready: hasPurpose, hint: "AI에게 시킬 일을 한 문장으로 적어 보세요." },
+    { label: "누구를 위한지", ready: hasAudience, hint: "초보자·팀원·고객처럼 대상 독자를 적어 보세요." },
+    { label: "결과 모양", ready: hasFormat, hint: "표·체크리스트·3단계처럼 결과 형식을 정해 보세요." },
+    { label: "꼭 지킬 기준", ready: hasConstraint, hint: "사실 확인·금지 표현·분량 기준을 적어 보세요." },
+    { label: "완료 기준", ready: hasCompletion, hint: "좋은 결과의 기준이나 마지막 확인 항목을 정해 보세요." },
+  ];
+  const suggestions: PromptSuggestion[] = [];
+  if (!hasPurpose) suggestions.push({ id: "purpose", label: "할 일을 더 분명하게", detail: "AI가 시작할 수 있도록 핵심 업무를 한 문장으로 정합니다.", addition: "목적: 아래 내용을 핵심만 빠짐없이 정리해 바로 사용할 수 있는 초안을 만들어라." });
+  if (!hasAudience) suggestions.push({ id: "audience", label: "대상을 알려 주세요", detail: "누가 읽는지 알면 말투와 설명 수준이 맞아집니다.", addition: "대상: 이 결과를 처음 보는 초보자도 쉽게 이해할 수 있게 설명해라." });
+  if (!hasFormat) suggestions.push({ id: "format", label: "결과 모양을 정해 주세요", detail: "원하는 형식을 미리 정하면 복사해서 쓰기 쉬워집니다.", addition: "출력 형식: 제목, 핵심 요약, 실행 항목 순서의 Markdown으로 작성해라." });
+  if (!hasConstraint) suggestions.push({ id: "constraint", label: "지켜야 할 기준을 추가하세요", detail: "틀리면 안 되는 부분과 피할 표현을 알려 주세요.", addition: "기준: 확인하지 못한 내용은 사실처럼 단정하지 말고 [확인 필요]로 표시해라." });
+  if (!hasCompletion) suggestions.push({ id: "completion", label: "마지막 확인 항목을 넣어 보세요", detail: "결과의 품질을 스스로 점검할 수 있습니다.", addition: "마지막에 누락 정보와 다음 행동을 3개 이내로 정리해라." });
+  return { score: checks.filter((check) => check.ready).length * 20, checks, suggestions: suggestions.slice(0, 3) };
+}
+
 function inferRules(lines: string[]) {
   const joined = lines.join(" ");
   const rules: string[] = [];
@@ -402,6 +427,11 @@ function TemplatePicker({ selectedId, setSelectedId, applyTemplate }: { selected
   return <section className="template-picker"><div className="template-picker-head"><div><div className="section-kicker"><span className="counter">START FAST</span> PROMPT STARTER</div><h2>어떤 도움을 받고 싶나요?</h2><p>목적을 고르면 초보자용 문장이 채워집니다. 내 상황에 맞게 한두 줄만 고치면 됩니다.</p></div><div className="template-wand"><WandSparkles size={17} /></div></div><div className="template-grid">{BEGINNER_TEMPLATES.map((template) => <button key={template.id} onClick={() => setSelectedId(template.id)} className={`template-card ${selected.id === template.id ? "is-selected" : ""}`}><span>{template.category}</span><strong>{template.title}</strong><small>{template.summary}</small></button>)}</div><div className="template-preview"><div><span className="font-mono text-[9px] font-semibold tracking-[.08em] text-[#2563EB]">선택한 시작 문구</span><p>{selected.notes}</p><div className="mt-3 flex flex-wrap gap-1.5">{selected.tags.map((tag) => <span key={tag} className="template-tag">#{tag}</span>)}</div></div><button onClick={() => applyTemplate(selected)} className="template-apply">이 템플릿으로 시작 <ChevronRight size={15} /></button></div></section>;
 }
 
+function PromptCoachPanel({ review, applySuggestion }: { review: PromptReview; applySuggestion: (suggestion: PromptSuggestion) => void }) {
+  const status = review.score >= 80 ? "완성도 높음" : review.score >= 40 ? "조금만 보완" : "시작 문구 보완";
+  return <section className="prompt-coach" aria-label="AI 프롬프트 코치"><div className="prompt-coach-head"><div><div className="section-kicker"><span className="counter">AI COACH</span> PROMPT REVIEW</div><h3>AI가 이해하기 쉬운지 점검했어요</h3><p>목적·대상·결과 모양·기준을 확인하고, 필요한 문장만 제안합니다.</p></div><div className="coach-score"><strong>{review.score}</strong><span>/ 100</span><em>{status}</em></div></div><div className="coach-checks">{review.checks.map((check) => <span key={check.label} className={check.ready ? "is-ready" : ""}>{check.ready ? <Check size={11} /> : <span className="coach-dot" />}{check.label}</span>)}</div>{review.suggestions.length ? <div className="mt-4 space-y-2">{review.suggestions.map((suggestion) => <div key={suggestion.id} className="coach-suggestion"><div><strong>{suggestion.label}</strong><p>{suggestion.detail}</p><code>{suggestion.addition}</code></div><button onClick={() => applySuggestion(suggestion)}>문장 추가 <Plus size={13} /></button></div>)}</div> : <div className="coach-success"><Check size={15} /> 필요한 핵심 요소가 담겼습니다. 이제 ‘문서 만들기’를 눌러도 좋습니다.</div>}</section>;
+}
+
 function TagGroupsPanel({ groups, name, setName, tags, setTags, saveGroup, applyGroup, deleteGroup }: { groups: TagGroup[]; name: string; setName: (value: string) => void; tags: string; setTags: (value: string) => void; saveGroup: () => void; applyGroup: (group: TagGroup) => void; deleteGroup: (id: string) => void }) {
   return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">05</span> TAG GROUPS</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">자주 쓰는 태그 묶음</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><Layers3 size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">업무·프로젝트별 태그를 묶어 두면 현재 입력란에 한 번에 적용할 수 있습니다.</p><div className="mt-5 grid gap-2 sm:grid-cols-[.8fr_1.2fr_auto]"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 식품 QC" className="field-input h-9 py-1.5 text-[11px]" /><input value={tags} onChange={(event) => setTags(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveGroup(); }} placeholder="품질관리, HACCP, 미생물" className="field-input h-9 py-1.5 text-[11px]" /><button onClick={saveGroup} className="inline-flex h-9 items-center justify-center gap-1 bg-[#1C1D21] px-3 font-mono text-[10px] font-semibold text-white transition hover:bg-[#2563EB]"><Plus size={13} /> 그룹 저장</button></div>{groups.length ? <div className="mt-4 space-y-2">{groups.map((group) => <div key={group.id} className="flex items-center justify-between gap-2 border border-[#1C1D21]/10 bg-white/75 p-2"><button onClick={() => applyGroup(group)} className="min-w-0 flex-1 text-left"><span className="block text-[12px] font-semibold text-[#292B30]">{group.name}</span><span className="mt-1 block truncate font-mono text-[9px] text-[#6D6F74]">{group.tags.map((tag) => `#${tag}`).join(" · ")}</span></button><button onClick={() => applyGroup(group)} className="tool-button shrink-0">적용</button><button onClick={() => deleteGroup(group.id)} aria-label={`${group.name} 그룹 삭제`} className="flex h-8 w-8 shrink-0 items-center justify-center border border-[#1C1D21]/10 text-[#85878A] transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /></button></div>)}</div> : <div className="mt-4 border border-dashed border-[#1C1D21]/15 bg-[#F0ECE4] px-3 py-4 font-mono text-[9px] text-[#77797C]">예: “식품 QC”에 품질관리, HACCP, 미생물을 묶어 저장해 보세요.</div>}</div>;
 }
@@ -505,6 +535,7 @@ export default function Home() {
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [selectedTemplateId, setSelectedTemplateId] = useState(BEGINNER_TEMPLATES[0].id);
   const selectedProviders = PROVIDERS.filter((provider) => selected.includes(provider.id));
+  const promptReview = useMemo(() => reviewPrompt(title, notes), [title, notes]);
   const sourceLines = useMemo(() => normalizeLines(notes), [notes]);
   const selectedProvider = PROVIDERS.find((provider) => provider.id === activeProvider) ?? PROVIDERS[0];
   const source = sourceLines.length ? sourceLines : normalizeLines(EXAMPLE);
@@ -561,6 +592,12 @@ export default function Home() {
     setTitle(template.title); setNotes(template.notes); setTagInput(normalizeTags([...normalizeTags(tagInput), ...template.tags].join(",")).join(", "));
     setHasGenerated(false); window.setTimeout(() => scrollToStep("step-note"), 0);
     toast.success(`“${template.title}” 템플릿을 불러왔습니다.`, { description: "메모에서 내 상황에 맞게 한두 줄만 고쳐 보세요." });
+  }
+
+  function applyPromptSuggestion(suggestion: PromptSuggestion) {
+    if (notes.includes(suggestion.addition)) { toast.message("이 문장은 이미 메모에 들어 있습니다."); return; }
+    setNotes([notes.trim(), suggestion.addition].filter(Boolean).join("\n"));
+    setHasGenerated(false); toast.success("수정 제안을 메모에 추가했습니다.");
   }
 
   async function copyDocument() { await navigator.clipboard.writeText(document); setCopied(true); toast.success("Markdown을 복사했습니다."); window.setTimeout(() => setCopied(false), 1600); }
@@ -770,6 +807,7 @@ function applyBackupImport() {
       <section className="mt-7 grid gap-7 xl:grid-cols-[minmax(360px,5fr)_minmax(560px,7fr)]"><div className="space-y-5">
         <div id="step-note" className="editor-card scroll-mt-24 p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">02</span> RAW NOTES</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">먼저, 원하는 일을 적어 주세요</h2></div><button onClick={loadExample} className="inline-flex shrink-0 items-center gap-1.5 border border-[#1C1D21]/15 bg-white px-3 py-2 font-mono text-[10px] font-semibold transition hover:border-[#2563EB] hover:text-[#2563EB] active:scale-[0.97]"><WandSparkles size={13} /> 쉬운 예시</button></div><p className="beginner-inline-tip">무엇을 만들지, 답변이 어떤 모양이면 좋은지, 꼭 지킬 기준만 적으세요. 문장이 완벽하지 않아도 됩니다.</p>
           <label className="mt-7 block"><span className="field-label">문서 이름 <HelpTip text="나중에 보관함에서 찾기 쉬운 이름입니다. 비워도 됩니다." /></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 연구소 업무 보조" className="field-input mt-2" /></label><label className="mt-5 block"><span className="field-label">기능 · 업무 · 말투 · 금지 사항 <HelpTip text="AI에게 시킬 일, 원하는 결과, 꼭 지킬 기준을 적어 주세요." /></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="예: 매일 작성하는 보고서, 원하는 답변 방식, 반드시 지킬 기준을 편하게 적어 주세요." className="field-input mt-2 min-h-[238px] resize-y py-3 leading-7" /></label><div className="mt-2 flex justify-between font-mono text-[10px] text-[#888A8C]"><span>문장·불릿 모두 가능</span><span>{notes.length.toLocaleString()} chars</span></div>
+          <PromptCoachPanel review={promptReview} applySuggestion={applyPromptSuggestion} />
         </div>
         <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} />
         <TagGroupsPanel groups={tagGroups} name={tagGroupName} setName={setTagGroupName} tags={tagGroupInput} setTags={setTagGroupInput} saveGroup={saveTagGroup} applyGroup={applyTagGroup} deleteGroup={deleteTagGroup} />
