@@ -1,6 +1,6 @@
 /** Design: Editorial Command Desk — warm paper, cobalt ink, precise editorial hierarchy. */
 /** Editorial Command Desk: a calm, paper-like beginner workflow from note to usable prompt. */
-import { useDeferredValue, useMemo, useState, type CSSProperties } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Archive, BarChart3, BookmarkPlus, Check, ChevronRight, Clipboard, Cloud, DatabaseBackup, Download, FileDown, FileText, FileUp, FolderOpen, KeyRound, Layers3, Loader2, Moon, Plus, Search, Settings2, Sparkles, Sun, Tag, Target, ThumbsDown, ThumbsUp, Trash2, UserRound, WandSparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -364,12 +364,12 @@ type LibraryPanelProps = {
   saveName: string; setSaveName: (value: string) => void; saveKind: "profile" | "prompt"; setSaveKind: (value: "profile" | "prompt") => void;
   tagInput: string; setTagInput: (value: string) => void; libraryQuery: string; setLibraryQuery: (value: string) => void;
   kindFilter: "all" | "profile" | "prompt"; setKindFilter: (value: "all" | "profile" | "prompt") => void; tagFilter: string; setTagFilter: (value: string) => void;
-  allTags: string[]; suggestedTags: string[]; applySuggestedTag: (tag: string) => void; rejectSuggestedTag: (tag: string) => void; filteredLibrary: SavedEntry[]; libraryCount: number; saveToLibrary: () => void; loadFromLibrary: (entry: SavedEntry) => void; deleteFromLibrary: (entry: SavedEntry) => void;
+  allTags: string[]; suggestedTags: string[]; applySuggestedTag: (tag: string) => void; rejectSuggestedTag: (tag: string) => void; filteredLibrary: SavedEntry[]; libraryCount: number; saveToLibrary: () => void; loadFromLibrary: (entry: SavedEntry) => void; deleteFromLibrary: (entry: SavedEntry) => void; guideFocus?: boolean;
 };
 
 function LibraryPanel(props: LibraryPanelProps) {
-  const { saveName, setSaveName, saveKind, setSaveKind, tagInput, setTagInput, libraryQuery, setLibraryQuery, kindFilter, setKindFilter, tagFilter, setTagFilter, allTags, suggestedTags, applySuggestedTag, rejectSuggestedTag, filteredLibrary, libraryCount, saveToLibrary, loadFromLibrary, deleteFromLibrary } = props;
-  return <div id="step-tags" className="editor-card scroll-mt-24 p-6 md:p-7">
+  const { saveName, setSaveName, saveKind, setSaveKind, tagInput, setTagInput, libraryQuery, setLibraryQuery, kindFilter, setKindFilter, tagFilter, setTagFilter, allTags, suggestedTags, applySuggestedTag, rejectSuggestedTag, filteredLibrary, libraryCount, saveToLibrary, loadFromLibrary, deleteFromLibrary, guideFocus } = props;
+  return <div id="step-tags" className={`editor-card scroll-mt-24 p-6 md:p-7 ${guideFocus ? "guide-focus" : ""}`}>
     <div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">03</span> LOCAL LIBRARY</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">자주 쓰는 설정 보관함</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><Archive size={15} /></div></div>
     <p className="mt-2 text-[12px] leading-5 text-[#66686C]">이 브라우저에만 저장됩니다. 계정이나 서버로 전송하지 않습니다.</p>
     <div className="mt-5 grid gap-2 sm:grid-cols-[1fr_170px_auto]"><input value={saveName} onChange={(event) => setSaveName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveToLibrary(); }} placeholder="예: 식품 QC 프로필" className="field-input" /><div className="grid grid-cols-2 border border-[#1C1D21]/15 p-1"><button onClick={() => setSaveKind("profile")} className={`flex items-center justify-center gap-1 px-2 py-2 font-mono text-[9px] transition ${saveKind === "profile" ? "bg-[#1C1D21] text-white" : "text-[#67696C]"}`}><UserRound size={11} /> 프로필</button><button onClick={() => setSaveKind("prompt")} className={`flex items-center justify-center gap-1 px-2 py-2 font-mono text-[9px] transition ${saveKind === "prompt" ? "bg-[#1C1D21] text-white" : "text-[#67696C]"}`}><FileText size={11} /> 설정</button></div><button onClick={saveToLibrary} className="inline-flex items-center justify-center gap-1.5 bg-[#1C1D21] px-4 py-2.5 font-mono text-[10px] font-semibold text-white transition hover:bg-[#2563EB] active:scale-[0.97]"><BookmarkPlus size={14} /> 저장</button></div>
@@ -410,16 +410,21 @@ function HelpTip({ text }: { text: string }) {
   return <span className="help-tip" tabIndex={0} aria-label={`도움말: ${text}`}><span aria-hidden="true">?</span><span className="help-bubble">{text}</span></span>;
 }
 
-function OnboardingModal({ open, step, setStep, onFinish }: { open: boolean; step: number; setStep: (step: number) => void; onFinish: () => void }) {
+function OnboardingModal({ open, step, setStep, onFinish, onPractice }: { open: boolean; step: number; setStep: (step: number) => void; onFinish: () => void; onPractice: (target: string, message: string) => void }) {
   if (!open) return null;
   const slides = [
-    { icon: <WandSparkles size={24} />, label: "1단계 · 메모", title: "완벽하게 쓰지 않아도 됩니다", body: "AI에게 시킬 일, 원하는 결과 모습, 꼭 지킬 기준을 평소 말하듯 적어 주세요. 짧은 메모나 불릿도 괜찮습니다.", note: "막막하면 ‘쉬운 예시’ 버튼을 눌러 내 업무에 맞게 단어만 바꾸세요." },
-    { icon: <Tag size={24} />, label: "2단계 · 태그", title: "태그는 나중에 다시 찾기 위한 이름표입니다", body: "추천 태그를 수락하거나 자주 쓰는 태그 묶음을 한 번에 적용하세요. 지금 건너뛰어도 문서는 만들 수 있습니다.", note: "예: HACCP, 보고서, 유튜브, 데이터분석" },
-    { icon: <FileText size={24} />, label: "3단계 · 문서 만들기", title: "AI 서비스를 고르고 문서를 만드세요", body: "Claude, ChatGPT 등 필요한 서비스를 선택한 뒤 ‘문서 만들기’를 누르면 시작 지침과 스킬 문서가 정리됩니다.", note: "기본 선택 그대로 만들어도 됩니다." },
-    { icon: <Clipboard size={24} />, label: "4단계 · 복사·저장", title: "완성된 문서를 AI 대화 첫 메시지에 붙여넣으세요", body: "복사 버튼으로 바로 사용하거나 Markdown 파일로 저장하세요. 자주 쓰는 문서는 로컬 보관함에 저장할 수 있습니다.", note: "고급 기능은 오른쪽 위 설정에서 필요할 때만 열어 보세요." },
+    { icon: <WandSparkles size={24} />, label: "1단계 · 메모", title: "완벽하게 쓰지 않아도 됩니다", body: "AI에게 시킬 일, 원하는 결과 모습, 꼭 지킬 기준을 평소 말하듯 적어 주세요. 짧은 메모나 불릿도 괜찮습니다.", note: "막막하면 ‘쉬운 예시’ 버튼을 눌러 내 업무에 맞게 단어만 바꾸세요.", target: "step-note", practice: "여기에서 AI에게 시킬 일을 한두 문장으로 적어 보세요." },
+    { icon: <Tag size={24} />, label: "2단계 · 태그", title: "태그는 나중에 다시 찾기 위한 이름표입니다", body: "추천 태그를 수락하거나 자주 쓰는 태그 묶음을 한 번에 적용하세요. 지금 건너뛰어도 문서는 만들 수 있습니다.", note: "예: HACCP, 보고서, 유튜브, 데이터분석", target: "step-tags", practice: "추천 태그 하나를 수락하거나 필요한 태그를 쉼표로 적어 보세요." },
+    { icon: <FileText size={24} />, label: "3단계 · 문서 만들기", title: "AI 서비스를 고르고 문서를 만드세요", body: "Claude, ChatGPT 등 필요한 서비스를 선택한 뒤 ‘문서 만들기’를 누르면 시작 지침과 스킬 문서가 정리됩니다.", note: "기본 선택 그대로 만들어도 됩니다.", target: "step-create", practice: "서비스를 고른 뒤 ‘문서 만들기’를 눌러 보세요." },
+    { icon: <Clipboard size={24} />, label: "4단계 · 복사·저장", title: "완성된 문서를 AI 대화 첫 메시지에 붙여넣으세요", body: "복사 버튼으로 바로 사용하거나 Markdown 파일로 저장하세요. 자주 쓰는 문서는 로컬 보관함에 저장할 수 있습니다.", note: "고급 기능은 오른쪽 위 설정에서 필요할 때만 열어 보세요.", target: "step-result", practice: "완성된 문서를 복사하거나 필요한 위치에 저장해 보세요." },
   ];
   const current = slides[step];
-  return <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Prompt Folio 처음 사용 안내"><div className="onboarding-card"><button className="onboarding-skip" onClick={onFinish}>건너뛰기</button><div className="onboarding-icon">{current.icon}</div><div className="onboarding-label">{current.label}</div><h2>{current.title}</h2><p>{current.body}</p><div className="onboarding-note">{current.note}</div><div className="onboarding-progress">{slides.map((_, index) => <span key={index} className={index === step ? "is-current" : index < step ? "is-done" : ""} />)}</div><div className="mt-6 flex items-center justify-between gap-3"><button className="onboarding-back" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>이전</button><button className="onboarding-next" onClick={() => step === slides.length - 1 ? onFinish() : setStep(step + 1)}>{step === slides.length - 1 ? "시작하기" : "다음"}<ChevronRight size={15} /></button></div></div></div>;
+  const go = (next: number) => { setStep(next); };
+  return <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Prompt Folio 처음 사용 안내"><div className="onboarding-card"><button className="onboarding-skip" onClick={onFinish}>건너뛰기</button><div className="onboarding-step-label">STEP {step + 1} / {slides.length}</div><div className="onboarding-icon">{current.icon}</div><div className="onboarding-label">{current.label}</div><h2>{current.title}</h2><p>{current.body}</p><div className="onboarding-note">{current.note}</div><div className="onboarding-progress">{slides.map((slide, index) => <button key={slide.target} onClick={() => go(index)} aria-label={`${index + 1}단계 ${slide.label}`} className={index === step ? "is-current" : index < step ? "is-done" : ""} />)}</div><div className="mt-5 border-t border-[#1C1D21]/10 pt-4"><button className="onboarding-practice" onClick={() => onPractice(current.target, current.practice)}>이 단계 직접 해 보기 <ChevronRight size={14} /></button><p>안내창이 닫히고 해당 위치가 강조됩니다.</p></div><div className="mt-5 flex items-center justify-between gap-3"><button className="onboarding-back" onClick={() => go(Math.max(0, step - 1))} disabled={step === 0}>이전</button><button className="onboarding-next" onClick={() => step === slides.length - 1 ? onFinish() : go(step + 1)}>{step === slides.length - 1 ? "가이드 마치기" : "다음"}<ChevronRight size={15} /></button></div></div></div>;
+}
+
+function GuideNudge({ message, onClose }: { message: string; onClose: () => void }) {
+  return <div className="guide-nudge" role="status"><div><span className="guide-nudge-dot" /> <strong>지금 해 볼 차례</strong><p>{message}</p></div><button onClick={onClose}>알겠어요</button></div>;
 }
 
 function TemplatePicker({ selectedId, setSelectedId, applyTemplate }: { selectedId: string; setSelectedId: (id: string) => void; applyTemplate: (template: PromptTemplate) => void }) {
@@ -533,6 +538,8 @@ export default function Home() {
   const [systemOpen, setSystemOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem(ONBOARDING_KEY) !== "done");
   const [onboardingStep, setOnboardingStep] = useState(0);
+  const [guideFocus, setGuideFocus] = useState<string | null>(null);
+  const [guideMessage, setGuideMessage] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState(BEGINNER_TEMPLATES[0].id);
   const selectedProviders = PROVIDERS.filter((provider) => selected.includes(provider.id));
   const promptReview = useMemo(() => reviewPrompt(title, notes), [title, notes]);
@@ -560,6 +567,12 @@ export default function Home() {
     });
   }, [library, libraryQuery, kindFilter, tagFilter]);
 
+  useEffect(() => {
+    const closeWithEscape = (event: KeyboardEvent) => { if (event.key === "Escape" && onboardingOpen) finishOnboarding(); };
+    window.addEventListener("keydown", closeWithEscape);
+    return () => window.removeEventListener("keydown", closeWithEscape);
+  }, [onboardingOpen]);
+
   function toggleProvider(id: ProviderId) {
     setSelected((current) => {
       if (current.includes(id)) { const next = current.filter((item) => item !== id); return next.length ? next : current; }
@@ -586,6 +599,11 @@ export default function Home() {
 
   function reopenOnboarding() {
     setOnboardingStep(0); setOnboardingOpen(true);
+  }
+
+  function practiceOnboardingStep(target: string, message: string) {
+    finishOnboarding(); setGuideFocus(target); setGuideMessage(message);
+    window.setTimeout(() => scrollToStep(target), 30);
   }
 
   function applyTemplate(template: PromptTemplate) {
@@ -805,16 +823,16 @@ function applyBackupImport() {
       <BeginnerGuide notesReady={Boolean(notes.trim())} tagsReady={Boolean(tagInput.trim())} generated={hasGenerated} loadExample={loadExample} makeDocument={generate} />
       <TemplatePicker selectedId={selectedTemplateId} setSelectedId={setSelectedTemplateId} applyTemplate={applyTemplate} />
       <section className="mt-7 grid gap-7 xl:grid-cols-[minmax(360px,5fr)_minmax(560px,7fr)]"><div className="space-y-5">
-        <div id="step-note" className="editor-card scroll-mt-24 p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">02</span> RAW NOTES</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">먼저, 원하는 일을 적어 주세요</h2></div><button onClick={loadExample} className="inline-flex shrink-0 items-center gap-1.5 border border-[#1C1D21]/15 bg-white px-3 py-2 font-mono text-[10px] font-semibold transition hover:border-[#2563EB] hover:text-[#2563EB] active:scale-[0.97]"><WandSparkles size={13} /> 쉬운 예시</button></div><p className="beginner-inline-tip">무엇을 만들지, 답변이 어떤 모양이면 좋은지, 꼭 지킬 기준만 적으세요. 문장이 완벽하지 않아도 됩니다.</p>
+        <div id="step-note" className={`editor-card scroll-mt-24 p-6 md:p-7 ${guideFocus === "step-note" ? "guide-focus" : ""}`}><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">02</span> RAW NOTES</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">먼저, 원하는 일을 적어 주세요</h2></div><button onClick={loadExample} className="inline-flex shrink-0 items-center gap-1.5 border border-[#1C1D21]/15 bg-white px-3 py-2 font-mono text-[10px] font-semibold transition hover:border-[#2563EB] hover:text-[#2563EB] active:scale-[0.97]"><WandSparkles size={13} /> 쉬운 예시</button></div><p className="beginner-inline-tip">무엇을 만들지, 답변이 어떤 모양이면 좋은지, 꼭 지킬 기준만 적으세요. 문장이 완벽하지 않아도 됩니다.</p>
           <label className="mt-7 block"><span className="field-label">문서 이름 <HelpTip text="나중에 보관함에서 찾기 쉬운 이름입니다. 비워도 됩니다." /></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 연구소 업무 보조" className="field-input mt-2" /></label><label className="mt-5 block"><span className="field-label">기능 · 업무 · 말투 · 금지 사항 <HelpTip text="AI에게 시킬 일, 원하는 결과, 꼭 지킬 기준을 적어 주세요." /></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="예: 매일 작성하는 보고서, 원하는 답변 방식, 반드시 지킬 기준을 편하게 적어 주세요." className="field-input mt-2 min-h-[238px] resize-y py-3 leading-7" /></label><div className="mt-2 flex justify-between font-mono text-[10px] text-[#888A8C]"><span>문장·불릿 모두 가능</span><span>{notes.length.toLocaleString()} chars</span></div>
           <PromptCoachPanel review={promptReview} applySuggestion={applyPromptSuggestion} />
         </div>
-        <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} />
+        <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} guideFocus={guideFocus === "step-tags"} />
         <TagGroupsPanel groups={tagGroups} name={tagGroupName} setName={setTagGroupName} tags={tagGroupInput} setTags={setTagGroupInput} saveGroup={saveTagGroup} applyGroup={applyTagGroup} deleteGroup={deleteTagGroup} />
         <div className="advanced-nudge"><span><Settings2 size={14} /> 더 세밀하게 설정하고 싶나요?</span><button onClick={() => setSystemOpen(true)}>시스템 설정 열기 <ChevronRight size={13} /></button></div>
-        <div className="editor-card p-6 md:p-7"><div className="section-kicker"><span className="counter">08</span> COMPILE OPTIONS</div><div className="mt-5 grid gap-6 sm:grid-cols-2"><div><span className="field-label">압축 강도</span><div className="mt-2 grid grid-cols-3 border border-[#1C1D21]/15 p-1">{(["compact", "balanced", "detailed"] as DetailLevel[]).map((item) => <button key={item} onClick={() => setDetail(item)} className={`px-2 py-2 font-mono text-[10px] transition ${detail === item ? "bg-[#1C1D21] text-white" : "text-[#67696C] hover:bg-[#EEE9DF]"}`}>{item === "compact" ? "짧게" : item === "balanced" ? "균형" : "자세히"}</button>)}</div></div><div><span className="field-label">선택 서비스</span><div className="mt-2 flex flex-wrap gap-1.5">{PROVIDERS.map((provider) => <button key={provider.id} onClick={() => toggleProvider(provider.id)} className={`provider-check ${selected.includes(provider.id) ? "is-active" : ""}`} style={{ "--provider": provider.color } as CSSProperties}><span className="check-dot">{selected.includes(provider.id) && <Check size={10} strokeWidth={3} />}</span>{provider.label}</button>)}</div></div></div><button onClick={generate} className="generate-button mt-7 w-full"><Sparkles size={17} /> {selected.length}개 서비스용 Markdown 만들기 <ChevronRight size={17} /></button></div>
+        <div id="step-create" className={`editor-card scroll-mt-24 p-6 md:p-7 ${guideFocus === "step-create" ? "guide-focus" : ""}`}><div className="section-kicker"><span className="counter">08</span> COMPILE OPTIONS</div><div className="mt-5 grid gap-6 sm:grid-cols-2"><div><span className="field-label">압축 강도</span><div className="mt-2 grid grid-cols-3 border border-[#1C1D21]/15 p-1">{(["compact", "balanced", "detailed"] as DetailLevel[]).map((item) => <button key={item} onClick={() => setDetail(item)} className={`px-2 py-2 font-mono text-[10px] transition ${detail === item ? "bg-[#1C1D21] text-white" : "text-[#67696C] hover:bg-[#EEE9DF]"}`}>{item === "compact" ? "짧게" : item === "balanced" ? "균형" : "자세히"}</button>)}</div></div><div><span className="field-label">선택 서비스</span><div className="mt-2 flex flex-wrap gap-1.5">{PROVIDERS.map((provider) => <button key={provider.id} onClick={() => toggleProvider(provider.id)} className={`provider-check ${selected.includes(provider.id) ? "is-active" : ""}`} style={{ "--provider": provider.color } as CSSProperties}><span className="check-dot">{selected.includes(provider.id) && <Check size={10} strokeWidth={3} />}</span>{provider.label}</button>)}</div></div></div><button onClick={generate} className="generate-button mt-7 w-full"><Sparkles size={17} /> {selected.length}개 서비스용 Markdown 만들기 <ChevronRight size={17} /></button></div>
       </div>
-      <div id="step-result" className="result-card scroll-mt-24 min-h-[680px] overflow-hidden"><div className="result-topbar flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:px-7"><div><div className="section-kicker text-[#ABB7D5]"><span className="counter border-[#ABB7D5]/50 text-[#D7E2FF]">04</span> {hasGenerated ? "COMPILED OUTPUT" : "OUTPUT PREVIEW"}</div><h2 className="mt-2 font-serif text-2xl font-bold tracking-[-0.04em] text-white">{hasGenerated ? "복사하고 바로 사용하세요" : "정리된 문서가 이곳에 표시됩니다"} <HelpTip text="복사 버튼을 누른 뒤 선택한 AI 서비스의 새 대화 첫 메시지에 붙여넣으세요." /></h2></div><div className="flex gap-2"><button onClick={copyDocument} className="result-action"><Clipboard size={14} /> {copied ? "복사됨" : "복사"}</button><button onClick={() => downloadText(activeDocument === "start" ? selectedProvider.startFile : selectedProvider.skillFile, document)} className="result-action"><Download size={14} /> .md 저장</button></div></div>
+      <div id="step-result" className={`result-card scroll-mt-24 min-h-[680px] overflow-hidden ${guideFocus === "step-result" ? "guide-focus" : ""}`}><div className="result-topbar flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between md:px-7"><div><div className="section-kicker text-[#ABB7D5]"><span className="counter border-[#ABB7D5]/50 text-[#D7E2FF]">04</span> {hasGenerated ? "COMPILED OUTPUT" : "OUTPUT PREVIEW"}</div><h2 className="mt-2 font-serif text-2xl font-bold tracking-[-0.04em] text-white">{hasGenerated ? "복사하고 바로 사용하세요" : "정리된 문서가 이곳에 표시됩니다"} <HelpTip text="복사 버튼을 누른 뒤 선택한 AI 서비스의 새 대화 첫 메시지에 붙여넣으세요." /></h2></div><div className="flex gap-2"><button onClick={copyDocument} className="result-action"><Clipboard size={14} /> {copied ? "복사됨" : "복사"}</button><button onClick={() => downloadText(activeDocument === "start" ? selectedProvider.startFile : selectedProvider.skillFile, document)} className="result-action"><Download size={14} /> .md 저장</button></div></div>
         <div className="border-b border-white/10 bg-[#232A3C] px-5 pt-4 md:px-7"><div className="flex gap-1 overflow-x-auto pb-0">{selectedProviders.map((provider) => <button key={provider.id} onClick={() => setActiveProvider(provider.id)} className={`provider-tab ${activeProvider === provider.id ? "is-current" : ""}`}><span style={{ backgroundColor: provider.color }} />{provider.label}</button>)}</div></div>
         <div className="flex gap-1 border-b border-[#1C1D21]/10 bg-[#F0ECE4] px-5 pt-3 md:px-7"><button onClick={() => setActiveDocument("start")} className={`document-tab ${activeDocument === "start" ? "is-current" : ""}`}><FileText size={14} /> 시작 지침 <span>{selectedProvider.startFile}</span></button><button onClick={() => setActiveDocument("skill")} className={`document-tab ${activeDocument === "skill" ? "is-current" : ""}`}><Layers3 size={14} /> 스킬 <span>{selectedProvider.skillFile}</span></button></div>
         <div className="paper-preview relative"><div className="absolute right-0 top-0 h-9 w-9 border-b border-l border-[#1C1D21]/10 bg-[#E2DDD4] [clip-path:polygon(0_0,100%_100%,100%_0)]" /><div className="flex items-center justify-between border-b border-[#1C1D21]/10 pb-4"><div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#64666A]"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: selectedProvider.color }} /> {activeDocument === "start" ? selectedProvider.startFile : selectedProvider.skillFile}</div><span className="font-mono text-[10px] text-[#8C8E90]">{document.length.toLocaleString()} chars</span></div><pre className="markdown-output">{document}</pre></div>
@@ -833,6 +851,7 @@ function applyBackupImport() {
       <TagAnalyticsPanel feedback={tagFeedback} />
       <FeedbackControlsPanel feedback={tagFeedback} history={feedbackHistory} settings={exclusionSettings} updateSettings={updateExclusionSettings} exportAnalytics={exportAnalytics} />
     </SystemSettingsDrawer>
-    <OnboardingModal open={onboardingOpen} step={onboardingStep} setStep={setOnboardingStep} onFinish={finishOnboarding} />
+    <OnboardingModal open={onboardingOpen} step={onboardingStep} setStep={setOnboardingStep} onFinish={finishOnboarding} onPractice={practiceOnboardingStep} />
+    {guideFocus && <GuideNudge message={guideMessage} onClose={() => setGuideFocus(null)} />}
   </div>;
 }

@@ -197,6 +197,19 @@
   .conflict-choice.is-current { @apply border-[#2563EB] bg-[#EFF4FF] font-semibold text-[#2563EB]; }
   .safe-empty { @apply border border-dashed border-[#1C1D21]/15 bg-[#F0ECE4] px-3 py-4 font-mono text-[10px] leading-5 text-[#73757A]; }
   .safe-apply { @apply inline-flex items-center justify-center gap-1.5 bg-[#2563EB] px-4 py-2.5 font-mono text-[10px] font-semibold text-white transition hover:bg-[#1D4ED8] active:scale-[0.97]; }
+  .guide-focus { @apply relative z-20 ring-4 ring-[#2563EB]/35 ring-offset-4 ring-offset-[#F7F4ED]; animation: guidePulse 1.25s cubic-bezier(.23,1,.32,1) 2; }
+  .guide-nudge { @apply fixed bottom-4 left-4 right-4 z-[60] mx-auto flex max-w-xl items-center justify-between gap-4 border border-[#2563EB]/35 bg-[#F5F8FF] px-4 py-3 shadow-[5px_5px_0_0_#2563EB] md:left-auto; }
+  .guide-nudge strong { @apply font-mono text-[10px] text-[#2563EB]; }
+  .guide-nudge p { @apply mt-1 text-[11px] leading-5 text-[#3C4A65]; }
+  .guide-nudge-dot { @apply mr-1 inline-block h-2 w-2 rounded-full bg-[#2563EB]; }
+  .guide-nudge button { @apply shrink-0 border border-[#2563EB]/30 bg-white px-3 py-2 font-mono text-[10px] font-semibold text-[#2563EB] transition hover:bg-[#2563EB] hover:text-white; }
+  .onboarding-step-label { @apply mb-4 font-mono text-[9px] font-semibold tracking-[.14em] text-[#2563EB]; }
+  .onboarding-progress button { @apply h-1.5 flex-1 border-0 bg-[#DCE3F2] p-0 transition hover:bg-[#97B8FF]; }
+  .onboarding-progress button.is-current { @apply bg-[#2563EB]; }
+  .onboarding-progress button.is-done { @apply bg-[#6F9AF5]; }
+  .onboarding-practice { @apply inline-flex w-full items-center justify-center gap-1.5 border border-[#2563EB]/25 bg-[#EFF4FF] px-3 py-2.5 font-mono text-[10px] font-semibold text-[#2563EB] transition hover:bg-[#2563EB] hover:text-white active:scale-[0.97]; }
+  .onboarding-card > div > p { @apply mt-2 text-center font-mono text-[9px] text-[#77797C]; }
+  @keyframes guidePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); } 50% { box-shadow: 0 0 0 8px rgba(37,99,235,.14); } }
 }
 
 .dark body, .dark #root { background: #12161F; color: #E8EBF1; }
@@ -227,6 +240,12 @@
 .dark .onboarding-card { background-color: #1B2130; background-image: linear-gradient(135deg, rgba(37,99,235,.2), rgba(27,33,48,.95) 55%); border-color: rgba(232,235,241,.16); }
 .dark .onboarding-card h2, .dark .onboarding-card > p { color: #EDF0F6; }
 .dark .onboarding-note { background-color: rgba(37,99,235,.18); color: #C9D9FF; }
+.dark .guide-focus { ring-offset-color: #12161F; }
+.dark .guide-nudge { background-color: #1B2130; border-color: rgba(79,139,255,.45); }
+.dark .guide-nudge p { color: #D4DCEC; }
+.dark .guide-nudge button, .dark .onboarding-practice { background-color: #232B3C; border-color: rgba(79,139,255,.4); color: #C8D8FF; }
+.dark .onboarding-progress button { background-color: #34415B; }
+.dark .onboarding-progress button.is-current { background-color: #4F8BFF; }
 .dark .help-bubble { border-color: rgba(232,235,241,.2); }
 .dark .template-picker { background: linear-gradient(125deg, rgba(37,99,235,.22), rgba(27,33,48,.92)); border-color: rgba(232,235,241,.14); }
 .dark .template-picker-head h2, .dark .template-card strong { color: #EDF0F6; }
@@ -290,6 +309,10 @@
   .onboarding-card { max-width: none; padding: 1.5rem; }
   .onboarding-card h2 { font-size: 1.65rem; }
   .onboarding-card > p { font-size: 13px; line-height: 1.7; }
+  .onboarding-practice { min-height: 44px; }
+  .guide-nudge { bottom: .75rem; left: .75rem; right: .75rem; padding: .8rem; }
+  .guide-nudge p { font-size: 10px; }
+  .guide-nudge button { min-height: 38px; padding-left: .65rem; padding-right: .65rem; }
   .help-bubble { left: 0; transform: none; }
   .template-picker { margin-top: 1.25rem; padding: 1rem; }
   .template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
