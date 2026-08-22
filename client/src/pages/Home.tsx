@@ -236,7 +236,7 @@ function reviewPrompt(title: string, notes: string): PromptReview {
   if (!hasFormat) suggestions.push({ id: "format", label: "결과 모양을 정해 주세요", detail: "원하는 형식을 미리 정하면 복사해서 쓰기 쉬워집니다.", addition: "출력 형식: 제목, 핵심 요약, 실행 항목 순서의 Markdown으로 작성해라." });
   if (!hasConstraint) suggestions.push({ id: "constraint", label: "지켜야 할 기준을 추가하세요", detail: "틀리면 안 되는 부분과 피할 표현을 알려 주세요.", addition: "기준: 확인하지 못한 내용은 사실처럼 단정하지 말고 [확인 필요]로 표시해라." });
   if (!hasCompletion) suggestions.push({ id: "completion", label: "마지막 확인 항목을 넣어 보세요", detail: "결과의 품질을 스스로 점검할 수 있습니다.", addition: "마지막에 누락 정보와 다음 행동을 3개 이내로 정리해라." });
-  return { score: checks.filter((check) => check.ready).length * 20, checks, suggestions: suggestions.slice(0, 3) };
+  return { score: checks.filter((check) => check.ready).length * 20, checks, suggestions };
 }
 
 function LivePromptQualityMeter({ review, isUpdating }: { review: PromptReview; isUpdating: boolean }) {
@@ -445,6 +445,12 @@ function PromptCoachPanel({ review, applySuggestion }: { review: PromptReview; a
   return <section className="prompt-coach" aria-label="AI 프롬프트 코치"><div className="prompt-coach-head"><div><div className="section-kicker"><span className="counter">AI COACH</span> PROMPT REVIEW</div><h3>AI가 이해하기 쉬운지 점검했어요</h3><p>목적·대상·결과 모양·기준을 확인하고, 필요한 문장만 제안합니다.</p></div><div className="coach-score"><strong>{review.score}</strong><span>/ 100</span><em>{status}</em></div></div><div className="coach-checks">{review.checks.map((check) => <span key={check.label} className={check.ready ? "is-ready" : ""}>{check.ready ? <Check size={11} /> : <span className="coach-dot" />}{check.label}</span>)}</div>{review.suggestions.length ? <div className="mt-4 space-y-2">{review.suggestions.map((suggestion) => <div key={suggestion.id} className="coach-suggestion"><div><strong>{suggestion.label}</strong><p>{suggestion.detail}</p><code>{suggestion.addition}</code></div><button onClick={() => applySuggestion(suggestion)}>문장 추가 <Plus size={13} /></button></div>)}</div> : <div className="coach-success"><Check size={15} /> 필요한 핵심 요소가 담겼습니다. 이제 ‘문서 만들기’를 눌러도 좋습니다.</div>}</section>;
 }
 
+function PromptEnhanceAction({ review, enhance, canUndo, undo }: { review: PromptReview; enhance: () => void; canUndo: boolean; undo: () => void }) {
+  if (!review.suggestions.length) return canUndo ? <div className="prompt-enhance-action is-complete"><div><span className="font-mono text-[9px] font-semibold tracking-[.08em] text-[#2563EB]">ONE-CLICK ENHANCE</span><strong>고도화가 적용됐습니다.</strong><p>5가지 핵심 요소를 채웠습니다. 원래 메모가 더 좋다면 바로 되돌릴 수 있습니다.</p></div><div className="prompt-enhance-actions"><button onClick={undo} className="enhance-undo">고도화 되돌리기</button></div></div> : null;
+  const expected = Math.min(100, review.score + review.suggestions.length * 20);
+  return <div className="prompt-enhance-action"><div><span className="font-mono text-[9px] font-semibold tracking-[.08em] text-[#2563EB]">ONE-CLICK ENHANCE</span><strong>누락한 {review.suggestions.length}가지를 한 번에 보완할까요?</strong><p>현재 메모는 유지하고, 부족한 문장만 맨 아래에 덧붙입니다.</p><span className="enhance-score">예상 점수 {review.score} → {expected}</span></div><div className="prompt-enhance-actions"><button onClick={enhance}><WandSparkles size={14} /> 한 번에 고도화</button>{canUndo && <button onClick={undo} className="enhance-undo">되돌리기</button>}</div></div>;
+}
+
 function TagGroupsPanel({ groups, name, setName, tags, setTags, saveGroup, applyGroup, deleteGroup }: { groups: TagGroup[]; name: string; setName: (value: string) => void; tags: string; setTags: (value: string) => void; saveGroup: () => void; applyGroup: (group: TagGroup) => void; deleteGroup: (id: string) => void }) {
   return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">05</span> TAG GROUPS</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">자주 쓰는 태그 묶음</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><Layers3 size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">업무·프로젝트별 태그를 묶어 두면 현재 입력란에 한 번에 적용할 수 있습니다.</p><div className="mt-5 grid gap-2 sm:grid-cols-[.8fr_1.2fr_auto]"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 식품 QC" className="field-input h-9 py-1.5 text-[11px]" /><input value={tags} onChange={(event) => setTags(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveGroup(); }} placeholder="품질관리, HACCP, 미생물" className="field-input h-9 py-1.5 text-[11px]" /><button onClick={saveGroup} className="inline-flex h-9 items-center justify-center gap-1 bg-[#1C1D21] px-3 font-mono text-[10px] font-semibold text-white transition hover:bg-[#2563EB]"><Plus size={13} /> 그룹 저장</button></div>{groups.length ? <div className="mt-4 space-y-2">{groups.map((group) => <div key={group.id} className="flex items-center justify-between gap-2 border border-[#1C1D21]/10 bg-white/75 p-2"><button onClick={() => applyGroup(group)} className="min-w-0 flex-1 text-left"><span className="block text-[12px] font-semibold text-[#292B30]">{group.name}</span><span className="mt-1 block truncate font-mono text-[9px] text-[#6D6F74]">{group.tags.map((tag) => `#${tag}`).join(" · ")}</span></button><button onClick={() => applyGroup(group)} className="tool-button shrink-0">적용</button><button onClick={() => deleteGroup(group.id)} aria-label={`${group.name} 그룹 삭제`} className="flex h-8 w-8 shrink-0 items-center justify-center border border-[#1C1D21]/10 text-[#85878A] transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /></button></div>)}</div> : <div className="mt-4 border border-dashed border-[#1C1D21]/15 bg-[#F0ECE4] px-3 py-4 font-mono text-[9px] text-[#77797C]">예: “식품 QC”에 품질관리, HACCP, 미생물을 묶어 저장해 보세요.</div>}</div>;
 }
@@ -549,6 +555,7 @@ export default function Home() {
   const [guideFocus, setGuideFocus] = useState<string | null>(null);
   const [guideMessage, setGuideMessage] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState(BEGINNER_TEMPLATES[0].id);
+  const [previousNotes, setPreviousNotes] = useState<string | null>(null);
   const selectedProviders = PROVIDERS.filter((provider) => selected.includes(provider.id));
   const deferredNotes = useDeferredValue(notes);
   const promptReview = useMemo(() => reviewPrompt(title, deferredNotes), [title, deferredNotes]);
@@ -624,6 +631,21 @@ export default function Home() {
     if (notes.includes(suggestion.addition)) { toast.message("이 문장은 이미 메모에 들어 있습니다."); return; }
     setNotes([notes.trim(), suggestion.addition].filter(Boolean).join("\n"));
     setHasGenerated(false); toast.success("수정 제안을 메모에 추가했습니다.");
+  }
+
+  function enhancePrompt() {
+    const additions = promptReview.suggestions.filter((suggestion) => !notes.includes(suggestion.addition));
+    if (!additions.length) { toast.message("추가할 보완 문장이 없습니다."); return; }
+    setPreviousNotes(notes);
+    setNotes([notes.trim(), ...additions.map((suggestion) => suggestion.addition)].filter(Boolean).join("\n"));
+    setHasGenerated(false);
+    toast.success(`${additions.length}개 요소를 보완했습니다.`, { description: "원래 문장은 유지했고, 부족한 문장만 추가했습니다." });
+  }
+
+  function undoEnhancement() {
+    if (previousNotes === null) return;
+    setNotes(previousNotes); setPreviousNotes(null); setHasGenerated(false);
+    toast.success("고도화 전 메모로 되돌렸습니다.");
   }
 
   async function copyDocument() { await navigator.clipboard.writeText(document); setCopied(true); toast.success("Markdown을 복사했습니다."); window.setTimeout(() => setCopied(false), 1600); }
@@ -834,6 +856,7 @@ function applyBackupImport() {
         <div id="step-note" className={`editor-card scroll-mt-24 p-6 md:p-7 ${guideFocus === "step-note" ? "guide-focus" : ""}`}><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">02</span> RAW NOTES</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">먼저, 원하는 일을 적어 주세요</h2></div><button onClick={loadExample} className="inline-flex shrink-0 items-center gap-1.5 border border-[#1C1D21]/15 bg-white px-3 py-2 font-mono text-[10px] font-semibold transition hover:border-[#2563EB] hover:text-[#2563EB] active:scale-[0.97]"><WandSparkles size={13} /> 쉬운 예시</button></div><p className="beginner-inline-tip">무엇을 만들지, 답변이 어떤 모양이면 좋은지, 꼭 지킬 기준만 적으세요. 문장이 완벽하지 않아도 됩니다.</p>
           <label className="mt-7 block"><span className="field-label">문서 이름 <HelpTip text="나중에 보관함에서 찾기 쉬운 이름입니다. 비워도 됩니다." /></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 연구소 업무 보조" className="field-input mt-2" /></label><label className="mt-5 block"><span className="field-label">기능 · 업무 · 말투 · 금지 사항 <HelpTip text="AI에게 시킬 일, 원하는 결과, 꼭 지킬 기준을 적어 주세요." /></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} aria-describedby="live-quality-status" placeholder="예: 매일 작성하는 보고서, 원하는 답변 방식, 반드시 지킬 기준을 편하게 적어 주세요." className="field-input mt-2 min-h-[238px] resize-y py-3 leading-7" /></label><div className="mt-2 flex justify-between font-mono text-[10px] text-[#888A8C]"><span>문장·불릿 모두 가능</span><span>{notes.length.toLocaleString()} chars</span></div>
           <LivePromptQualityMeter review={promptReview} isUpdating={notes !== deferredNotes} />
+          <PromptEnhanceAction review={promptReview} enhance={enhancePrompt} canUndo={previousNotes !== null} undo={undoEnhancement} />
           <PromptCoachPanel review={promptReview} applySuggestion={applyPromptSuggestion} />
         </div>
         <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} guideFocus={guideFocus === "step-tags"} />
