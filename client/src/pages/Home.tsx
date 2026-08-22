@@ -239,6 +239,14 @@ function reviewPrompt(title: string, notes: string): PromptReview {
   return { score: checks.filter((check) => check.ready).length * 20, checks, suggestions: suggestions.slice(0, 3) };
 }
 
+function LivePromptQualityMeter({ review, isUpdating }: { review: PromptReview; isUpdating: boolean }) {
+  const completed = review.checks.filter((check) => check.ready).length;
+  const next = review.suggestions[0];
+  const tone = review.score >= 80 ? "ready" : review.score >= 40 ? "building" : "start";
+  const label = review.score >= 80 ? "거의 준비됐어요" : review.score >= 40 ? "좋아지고 있어요" : "첫 문장부터 시작해요";
+  return <section id="live-quality-status" className={`live-quality ${tone}`} aria-live="polite"><div className="live-quality-head"><div><span className="section-kicker"><span className="counter">LIVE</span> AI QUALITY CHECK</span><h3>실시간 프롬프트 평가</h3><p>{isUpdating ? "입력 내용을 점검하는 중…" : `5가지 기준 중 ${completed}개를 채웠습니다.`}</p></div><div className="live-quality-score"><strong>{review.score}</strong><span>/ 100</span></div></div><div className="live-quality-track" aria-label={`프롬프트 품질 ${review.score}점`}><span style={{ width: `${review.score}%` }} /></div><div className="live-quality-criteria">{review.checks.map((check) => <span key={check.label} className={check.ready ? "is-ready" : ""}>{check.ready ? <Check size={10} strokeWidth={3} /> : <i className="quality-dot" />}{check.label}</span>)}</div><div className="live-quality-next"><span>다음 한 가지</span><strong>{next ? next.label : "이제 문서를 만들어 보세요"}</strong><p>{next ? next.detail : "필요한 내용을 모두 갖췄습니다. 아래 버튼으로 문서를 만들면 됩니다."}</p><em>{label}</em></div></section>;
+}
+
 function inferRules(lines: string[]) {
   const joined = lines.join(" ");
   const rules: string[] = [];
@@ -542,7 +550,8 @@ export default function Home() {
   const [guideMessage, setGuideMessage] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState(BEGINNER_TEMPLATES[0].id);
   const selectedProviders = PROVIDERS.filter((provider) => selected.includes(provider.id));
-  const promptReview = useMemo(() => reviewPrompt(title, notes), [title, notes]);
+  const deferredNotes = useDeferredValue(notes);
+  const promptReview = useMemo(() => reviewPrompt(title, deferredNotes), [title, deferredNotes]);
   const sourceLines = useMemo(() => normalizeLines(notes), [notes]);
   const selectedProvider = PROVIDERS.find((provider) => provider.id === activeProvider) ?? PROVIDERS[0];
   const source = sourceLines.length ? sourceLines : normalizeLines(EXAMPLE);
@@ -550,7 +559,6 @@ export default function Home() {
   const allTags = useMemo(() => Array.from(new Set([...library.flatMap((entry) => entry.tags), ...customTags])).sort((a, b) => a.localeCompare(b, "ko")), [library, customTags]);
   const localSuggestedTags = useMemo(() => recommendTags(title, notes, selected, allTags, saveKind, tagFeedback, exclusionSettings).filter((tag) => !normalizeTags(tagInput).includes(tag)), [title, notes, selected, allTags, saveKind, tagInput, tagFeedback, exclusionSettings]);
   const suggestedTags = (aiMode === "cheapai" && remoteSuggestedTags.length ? remoteSuggestedTags : localSuggestedTags).filter((tag) => !normalizeTags(tagInput).includes(tag) && !dismissedTags.includes(tag) && !isTagExcluded(tag, tagFeedback, exclusionSettings));
-  const deferredNotes = useDeferredValue(notes);
   const optimizationResult = useMemo(() => optimizeForCheapAi(deferredNotes, optimizationIntensity), [deferredNotes, optimizationIntensity]);
   const optimizedNotes = optimizationResult.text;
   const rawInputTokens = Math.max(110, Math.ceil((title.length + notes.length + allTags.join(",").length + 420) / 2.5));
@@ -824,7 +832,8 @@ function applyBackupImport() {
       <TemplatePicker selectedId={selectedTemplateId} setSelectedId={setSelectedTemplateId} applyTemplate={applyTemplate} />
       <section className="mt-7 grid gap-7 xl:grid-cols-[minmax(360px,5fr)_minmax(560px,7fr)]"><div className="space-y-5">
         <div id="step-note" className={`editor-card scroll-mt-24 p-6 md:p-7 ${guideFocus === "step-note" ? "guide-focus" : ""}`}><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">02</span> RAW NOTES</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">먼저, 원하는 일을 적어 주세요</h2></div><button onClick={loadExample} className="inline-flex shrink-0 items-center gap-1.5 border border-[#1C1D21]/15 bg-white px-3 py-2 font-mono text-[10px] font-semibold transition hover:border-[#2563EB] hover:text-[#2563EB] active:scale-[0.97]"><WandSparkles size={13} /> 쉬운 예시</button></div><p className="beginner-inline-tip">무엇을 만들지, 답변이 어떤 모양이면 좋은지, 꼭 지킬 기준만 적으세요. 문장이 완벽하지 않아도 됩니다.</p>
-          <label className="mt-7 block"><span className="field-label">문서 이름 <HelpTip text="나중에 보관함에서 찾기 쉬운 이름입니다. 비워도 됩니다." /></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 연구소 업무 보조" className="field-input mt-2" /></label><label className="mt-5 block"><span className="field-label">기능 · 업무 · 말투 · 금지 사항 <HelpTip text="AI에게 시킬 일, 원하는 결과, 꼭 지킬 기준을 적어 주세요." /></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="예: 매일 작성하는 보고서, 원하는 답변 방식, 반드시 지킬 기준을 편하게 적어 주세요." className="field-input mt-2 min-h-[238px] resize-y py-3 leading-7" /></label><div className="mt-2 flex justify-between font-mono text-[10px] text-[#888A8C]"><span>문장·불릿 모두 가능</span><span>{notes.length.toLocaleString()} chars</span></div>
+          <label className="mt-7 block"><span className="field-label">문서 이름 <HelpTip text="나중에 보관함에서 찾기 쉬운 이름입니다. 비워도 됩니다." /></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 연구소 업무 보조" className="field-input mt-2" /></label><label className="mt-5 block"><span className="field-label">기능 · 업무 · 말투 · 금지 사항 <HelpTip text="AI에게 시킬 일, 원하는 결과, 꼭 지킬 기준을 적어 주세요." /></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} aria-describedby="live-quality-status" placeholder="예: 매일 작성하는 보고서, 원하는 답변 방식, 반드시 지킬 기준을 편하게 적어 주세요." className="field-input mt-2 min-h-[238px] resize-y py-3 leading-7" /></label><div className="mt-2 flex justify-between font-mono text-[10px] text-[#888A8C]"><span>문장·불릿 모두 가능</span><span>{notes.length.toLocaleString()} chars</span></div>
+          <LivePromptQualityMeter review={promptReview} isUpdating={notes !== deferredNotes} />
           <PromptCoachPanel review={promptReview} applySuggestion={applyPromptSuggestion} />
         </div>
         <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} guideFocus={guideFocus === "step-tags"} />
