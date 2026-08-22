@@ -22,6 +22,7 @@ type OptimizationResult = { text: string; protectedRules: number; mergedSentence
 type ConflictDecision = "keep-local" | "use-backup" | "merge-tags";
 type BackupConflict = { key: string; local: SavedEntry; incoming: SavedEntry };
 type BackupPreview = { fileName: string; library: SavedEntry[]; customTags: string[]; newCount: number; updateCount: number; sameCount: number; conflicts: BackupConflict[] };
+type PromptTemplate = { id: string; category: string; title: string; summary: string; tags: string[]; notes: string };
 
 const PROVIDERS: Provider[] = [
   { id: "claude", label: "Claude", color: "#D97757", startFile: "CLAUDE.md", skillFile: "SKILL.md", focus: "명확한 작업 원칙" },
@@ -35,6 +36,14 @@ const EXAMPLE = `나는 식품 제조 기업부설연구소에서 HACCP·FSSC220
 AI에게는 업무 초안을 짧고 구조적으로 정리해 달라고 요청한다. 불확실한 내용은 사실처럼 쓰지 말고, 필요한 전제와 확인 항목을 분리해라.
 결과는 바로 붙여 넣어 쓸 수 있는 표·체크리스트·보고서 문장으로 만들고, 설명은 한국어로 간결하게 작성해라.
 투자나 법률 조언처럼 위험한 의사결정은 일반 정보와 확인 질문만 제공해라.`;
+
+const BEGINNER_TEMPLATES: PromptTemplate[] = [
+  { id: "report", category: "업무", title: "보고서 초안 도우미", summary: "메모를 구조적인 보고서 초안으로 정리", tags: ["문서작성", "업무자동화"], notes: "당신은 실무 보고서 작성 도우미다. 아래 메모를 제목, 핵심 요약, 본문, 확인할 사항 순서의 간결한 보고서 초안으로 정리해라. 불확실한 내용은 사실처럼 쓰지 말고 [확인 필요]로 표시해라. 결과는 바로 붙여 넣어 쓸 수 있는 한국어 Markdown으로 작성해라." },
+  { id: "analysis", category: "분석", title: "데이터 해석 도우미", summary: "숫자·표에서 핵심 변화와 확인 항목 찾기", tags: ["데이터분석", "보고서"], notes: "당신은 데이터 분석 보조자다. 제공한 숫자나 표를 보고 핵심 변화, 가능한 원인, 추가로 확인할 데이터, 다음 행동을 구분해 설명해라. 숫자 근거가 없는 추측은 추측이라고 밝혀라. 복잡한 용어보다 쉬운 한국어와 표·불릿을 우선 사용해라." },
+  { id: "research", category: "조사", title: "자료 조사 정리", summary: "신뢰할 자료를 찾아 비교·요약", tags: ["조사", "근거"], notes: "당신은 신중한 자료 조사 도우미다. 질문의 핵심을 먼저 한 줄로 정리하고, 신뢰할 수 있는 출처를 중심으로 사실과 해석을 분리해 요약해라. 출처·발행일·불확실한 점을 함께 적고, 마지막에 추가 확인 질문을 3개 이내로 제안해라." },
+  { id: "content", category: "콘텐츠", title: "쉽게 설명하는 콘텐츠 초안", summary: "복잡한 주제를 친절한 대본·글로 풀기", tags: ["콘텐츠", "프롬프트"], notes: "당신은 초보자 친화 콘텐츠 작가다. 제공한 주제를 일상적인 예시로 쉽게 설명해라. 제목, 한 줄 핵심, 3~5개 소제목, 바로 해 볼 행동 순으로 구성하고 과장·공포 조장·확인되지 않은 단정은 피하라. 따뜻하고 간결한 한국어로 작성해라." },
+  { id: "meeting", category: "정리", title: "회의 메모 정리", summary: "흩어진 메모를 결정·할 일 중심으로 정리", tags: ["회의", "업무자동화"], notes: "당신은 회의록 정리 도우미다. 아래 메모에서 결정된 사항, 담당자별 할 일, 기한, 아직 정해지지 않은 질문을 분리해라. 담당자나 기한이 없으면 억지로 만들지 말고 [미정]으로 표시해라. 결과는 짧고 확인하기 쉬운 표와 체크리스트로 작성해라." },
+];
 
 const LIBRARY_KEY = "prompt-folio-library-v1";
 const CUSTOM_TAGS_KEY = "prompt-folio-custom-tags-v1";
@@ -388,6 +397,11 @@ function OnboardingModal({ open, step, setStep, onFinish }: { open: boolean; ste
   return <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Prompt Folio 처음 사용 안내"><div className="onboarding-card"><button className="onboarding-skip" onClick={onFinish}>건너뛰기</button><div className="onboarding-icon">{current.icon}</div><div className="onboarding-label">{current.label}</div><h2>{current.title}</h2><p>{current.body}</p><div className="onboarding-note">{current.note}</div><div className="onboarding-progress">{slides.map((_, index) => <span key={index} className={index === step ? "is-current" : index < step ? "is-done" : ""} />)}</div><div className="mt-6 flex items-center justify-between gap-3"><button className="onboarding-back" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>이전</button><button className="onboarding-next" onClick={() => step === slides.length - 1 ? onFinish() : setStep(step + 1)}>{step === slides.length - 1 ? "시작하기" : "다음"}<ChevronRight size={15} /></button></div></div></div>;
 }
 
+function TemplatePicker({ selectedId, setSelectedId, applyTemplate }: { selectedId: string; setSelectedId: (id: string) => void; applyTemplate: (template: PromptTemplate) => void }) {
+  const selected = BEGINNER_TEMPLATES.find((template) => template.id === selectedId) ?? BEGINNER_TEMPLATES[0];
+  return <section className="template-picker"><div className="template-picker-head"><div><div className="section-kicker"><span className="counter">START FAST</span> PROMPT STARTER</div><h2>어떤 도움을 받고 싶나요?</h2><p>목적을 고르면 초보자용 문장이 채워집니다. 내 상황에 맞게 한두 줄만 고치면 됩니다.</p></div><div className="template-wand"><WandSparkles size={17} /></div></div><div className="template-grid">{BEGINNER_TEMPLATES.map((template) => <button key={template.id} onClick={() => setSelectedId(template.id)} className={`template-card ${selected.id === template.id ? "is-selected" : ""}`}><span>{template.category}</span><strong>{template.title}</strong><small>{template.summary}</small></button>)}</div><div className="template-preview"><div><span className="font-mono text-[9px] font-semibold tracking-[.08em] text-[#2563EB]">선택한 시작 문구</span><p>{selected.notes}</p><div className="mt-3 flex flex-wrap gap-1.5">{selected.tags.map((tag) => <span key={tag} className="template-tag">#{tag}</span>)}</div></div><button onClick={() => applyTemplate(selected)} className="template-apply">이 템플릿으로 시작 <ChevronRight size={15} /></button></div></section>;
+}
+
 function TagGroupsPanel({ groups, name, setName, tags, setTags, saveGroup, applyGroup, deleteGroup }: { groups: TagGroup[]; name: string; setName: (value: string) => void; tags: string; setTags: (value: string) => void; saveGroup: () => void; applyGroup: (group: TagGroup) => void; deleteGroup: (id: string) => void }) {
   return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">05</span> TAG GROUPS</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">자주 쓰는 태그 묶음</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><Layers3 size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">업무·프로젝트별 태그를 묶어 두면 현재 입력란에 한 번에 적용할 수 있습니다.</p><div className="mt-5 grid gap-2 sm:grid-cols-[.8fr_1.2fr_auto]"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 식품 QC" className="field-input h-9 py-1.5 text-[11px]" /><input value={tags} onChange={(event) => setTags(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") saveGroup(); }} placeholder="품질관리, HACCP, 미생물" className="field-input h-9 py-1.5 text-[11px]" /><button onClick={saveGroup} className="inline-flex h-9 items-center justify-center gap-1 bg-[#1C1D21] px-3 font-mono text-[10px] font-semibold text-white transition hover:bg-[#2563EB]"><Plus size={13} /> 그룹 저장</button></div>{groups.length ? <div className="mt-4 space-y-2">{groups.map((group) => <div key={group.id} className="flex items-center justify-between gap-2 border border-[#1C1D21]/10 bg-white/75 p-2"><button onClick={() => applyGroup(group)} className="min-w-0 flex-1 text-left"><span className="block text-[12px] font-semibold text-[#292B30]">{group.name}</span><span className="mt-1 block truncate font-mono text-[9px] text-[#6D6F74]">{group.tags.map((tag) => `#${tag}`).join(" · ")}</span></button><button onClick={() => applyGroup(group)} className="tool-button shrink-0">적용</button><button onClick={() => deleteGroup(group.id)} aria-label={`${group.name} 그룹 삭제`} className="flex h-8 w-8 shrink-0 items-center justify-center border border-[#1C1D21]/10 text-[#85878A] transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /></button></div>)}</div> : <div className="mt-4 border border-dashed border-[#1C1D21]/15 bg-[#F0ECE4] px-3 py-4 font-mono text-[9px] text-[#77797C]">예: “식품 QC”에 품질관리, HACCP, 미생물을 묶어 저장해 보세요.</div>}</div>;
 }
@@ -489,6 +503,7 @@ export default function Home() {
   const [systemOpen, setSystemOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem(ONBOARDING_KEY) !== "done");
   const [onboardingStep, setOnboardingStep] = useState(0);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(BEGINNER_TEMPLATES[0].id);
   const selectedProviders = PROVIDERS.filter((provider) => selected.includes(provider.id));
   const sourceLines = useMemo(() => normalizeLines(notes), [notes]);
   const selectedProvider = PROVIDERS.find((provider) => provider.id === activeProvider) ?? PROVIDERS[0];
@@ -540,6 +555,12 @@ export default function Home() {
 
   function reopenOnboarding() {
     setOnboardingStep(0); setOnboardingOpen(true);
+  }
+
+  function applyTemplate(template: PromptTemplate) {
+    setTitle(template.title); setNotes(template.notes); setTagInput(normalizeTags([...normalizeTags(tagInput), ...template.tags].join(",")).join(", "));
+    setHasGenerated(false); window.setTimeout(() => scrollToStep("step-note"), 0);
+    toast.success(`“${template.title}” 템플릿을 불러왔습니다.`, { description: "메모에서 내 상황에 맞게 한두 줄만 고쳐 보세요." });
   }
 
   async function copyDocument() { await navigator.clipboard.writeText(document); setCopied(true); toast.success("Markdown을 복사했습니다."); window.setTimeout(() => setCopied(false), 1600); }
@@ -745,6 +766,7 @@ function applyBackupImport() {
     <main id="top" className="mx-auto max-w-[1540px] px-5 pb-14 pt-8 md:px-8 md:pt-11">
       <section className="hero-sheet relative overflow-hidden border border-[#1C1D21]/10 bg-[#EEE9DF] p-7 md:p-10"><div className="relative z-10 max-w-3xl"><div className="section-kicker"><span className="counter">01</span> NOTE → INSTRUCTION</div><h1 className="mt-5 font-serif text-4xl font-bold leading-[1.08] tracking-[-0.055em] text-[#1B1D25] md:text-6xl">막 적어도 됩니다.<br /><em className="font-serif font-normal text-[#2563EB]">필요한 지침만</em> 남깁니다.</h1><p className="mt-5 max-w-xl text-[15px] leading-7 text-[#53555A]">내가 쓰는 기능, 업무 습관, 하네스를 자연어로 적으면 서비스별 시작 지침과 재사용 스킬 Markdown으로 압축합니다.</p></div><img src="/manus-storage/prompt-folio-hero_704a7a50.png" alt="흩어진 메모가 정리된 문서로 변환되는 추상 일러스트" className="pointer-events-none absolute -right-12 -top-8 hidden h-full w-[57%] object-cover mix-blend-multiply opacity-80 lg:block" /><div className="relative z-10 mt-8 flex flex-wrap gap-2">{["Claude", "ChatGPT", "Gemini", "Manus", "Perplexity"].map((name) => <span key={name} className="border border-[#1C1D21]/15 bg-[#F7F4ED]/75 px-3 py-1.5 font-mono text-[10px] font-medium tracking-wide text-[#4E5055]">{name}</span>)}</div></section>
       <BeginnerGuide notesReady={Boolean(notes.trim())} tagsReady={Boolean(tagInput.trim())} generated={hasGenerated} loadExample={loadExample} makeDocument={generate} />
+      <TemplatePicker selectedId={selectedTemplateId} setSelectedId={setSelectedTemplateId} applyTemplate={applyTemplate} />
       <section className="mt-7 grid gap-7 xl:grid-cols-[minmax(360px,5fr)_minmax(560px,7fr)]"><div className="space-y-5">
         <div id="step-note" className="editor-card scroll-mt-24 p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">02</span> RAW NOTES</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">먼저, 원하는 일을 적어 주세요</h2></div><button onClick={loadExample} className="inline-flex shrink-0 items-center gap-1.5 border border-[#1C1D21]/15 bg-white px-3 py-2 font-mono text-[10px] font-semibold transition hover:border-[#2563EB] hover:text-[#2563EB] active:scale-[0.97]"><WandSparkles size={13} /> 쉬운 예시</button></div><p className="beginner-inline-tip">무엇을 만들지, 답변이 어떤 모양이면 좋은지, 꼭 지킬 기준만 적으세요. 문장이 완벽하지 않아도 됩니다.</p>
           <label className="mt-7 block"><span className="field-label">문서 이름 <HelpTip text="나중에 보관함에서 찾기 쉬운 이름입니다. 비워도 됩니다." /></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 연구소 업무 보조" className="field-input mt-2" /></label><label className="mt-5 block"><span className="field-label">기능 · 업무 · 말투 · 금지 사항 <HelpTip text="AI에게 시킬 일, 원하는 결과, 꼭 지킬 기준을 적어 주세요." /></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="예: 매일 작성하는 보고서, 원하는 답변 방식, 반드시 지킬 기준을 편하게 적어 주세요." className="field-input mt-2 min-h-[238px] resize-y py-3 leading-7" /></label><div className="mt-2 flex justify-between font-mono text-[10px] text-[#888A8C]"><span>문장·불릿 모두 가능</span><span>{notes.length.toLocaleString()} chars</span></div>

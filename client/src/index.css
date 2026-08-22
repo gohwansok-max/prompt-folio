@@ -134,6 +134,21 @@
   .onboarding-progress span.is-done { @apply bg-[#86A8FF]; }
   .onboarding-back { @apply min-h-10 px-3 font-mono text-[10px] font-semibold text-[#67696E] transition hover:text-[#2563EB] disabled:cursor-not-allowed disabled:opacity-40; }
   .onboarding-next { @apply inline-flex min-h-10 items-center gap-1.5 bg-[#2563EB] px-5 font-mono text-[10px] font-semibold text-white shadow-[3px_3px_0_0_#162F70] transition hover:bg-[#1D4ED8] active:scale-[0.97]; }
+  .template-picker { @apply mt-7 border border-[#1C1D21]/10 bg-[#EEF3FF] p-5 md:p-7; background-image: linear-gradient(125deg, rgba(255,255,255,.75), rgba(238,243,255,.92)); }
+  .template-picker-head { @apply flex items-start justify-between gap-5; }
+  .template-picker-head h2 { @apply mt-2 font-serif text-2xl font-bold tracking-[-.04em] text-[#1E273B]; }
+  .template-picker-head p { @apply mt-2 max-w-2xl text-[12px] leading-5 text-[#5B6170]; }
+  .template-wand { @apply flex h-9 w-9 shrink-0 items-center justify-center border border-[#2563EB]/20 bg-white text-[#2563EB]; }
+  .template-grid { @apply mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5; }
+  .template-card { @apply flex min-h-28 flex-col items-start border border-[#1C1D21]/10 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-[#2563EB]/60 hover:shadow-[2px_3px_0_0_rgba(37,99,235,.25)] active:translate-y-0; }
+  .template-card.is-selected { @apply border-[#2563EB] bg-[#F7FAFF] shadow-[2px_3px_0_0_rgba(37,99,235,.45)]; }
+  .template-card span { @apply font-mono text-[9px] font-semibold tracking-[.08em] text-[#2563EB]; }
+  .template-card strong { @apply mt-2 text-[13px] leading-5 text-[#252A34]; }
+  .template-card small { @apply mt-1 text-[10px] leading-4 text-[#747782]; }
+  .template-preview { @apply mt-4 flex flex-col gap-4 border-l-2 border-[#2563EB] bg-white/80 p-4 md:flex-row md:items-end md:justify-between; }
+  .template-preview p { @apply mt-2 max-w-3xl text-[11px] leading-5 text-[#565A64]; }
+  .template-tag { @apply border border-[#2563EB]/20 bg-[#EFF4FF] px-1.5 py-0.5 font-mono text-[8px] text-[#3867BF]; }
+  .template-apply { @apply inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 bg-[#2563EB] px-4 font-mono text-[10px] font-semibold text-white shadow-[3px_3px_0_0_#162F70] transition hover:bg-[#1D4ED8] active:scale-[0.97]; }
   .advanced-nudge { @apply flex flex-col gap-2 border border-dashed border-[#1C1D21]/20 bg-[#F0ECE4]/70 px-4 py-3 text-[11px] text-[#62646A] sm:flex-row sm:items-center sm:justify-between; }
   .advanced-nudge span { @apply inline-flex items-center gap-2; }
   .advanced-nudge button { @apply inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-[#2563EB] hover:text-[#1D4ED8]; }
@@ -195,6 +210,11 @@
 .dark .onboarding-card h2, .dark .onboarding-card > p { color: #EDF0F6; }
 .dark .onboarding-note { background-color: rgba(37,99,235,.18); color: #C9D9FF; }
 .dark .help-bubble { border-color: rgba(232,235,241,.2); }
+.dark .template-picker { background: linear-gradient(125deg, rgba(37,99,235,.22), rgba(27,33,48,.92)); border-color: rgba(232,235,241,.14); }
+.dark .template-picker-head h2, .dark .template-card strong { color: #EDF0F6; }
+.dark .template-picker-head p, .dark .template-card small, .dark .template-preview p { color: #BBC3D3; }
+.dark .template-card, .dark .template-preview { background-color: #1B2130; border-color: rgba(232,235,241,.14); }
+.dark .template-card.is-selected { background-color: #202D4A; border-color: #4F8BFF; }
 .dark .system-drawer-head, .dark .system-panel { background-color: #1B2130; border-color: rgba(232,235,241,.14); }
 .dark .system-drawer-head h2, .dark .system-drawer-head p, .dark .system-panel h3, .dark .system-panel p, .dark .conflict-card strong, .dark .conflict-card p { color: #E8EBF1; }
 .dark .system-close, .dark .system-trigger, .dark .conflict-card, .dark .conflict-choice { background-color: #232B3C; border-color: rgba(232,235,241,.16); color: #E8EBF1; }
@@ -248,4 +268,10 @@
   .onboarding-card h2 { font-size: 1.65rem; }
   .onboarding-card > p { font-size: 13px; line-height: 1.7; }
   .help-bubble { left: 0; transform: none; }
+  .template-picker { margin-top: 1.25rem; padding: 1rem; }
+  .template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .template-card { min-height: 98px; padding: .75rem; }
+  .template-card:last-child { grid-column: span 2; }
+  .template-preview { padding: .875rem; }
+  .template-apply { width: 100%; }
 }
