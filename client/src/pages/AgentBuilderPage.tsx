@@ -31,6 +31,7 @@ export default function AgentBuilderPage() {
             <Link href="/dashboard" className="font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]">Dashboard</Link>
             <Link href="/library" className="font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]">Rule · Context</Link>
             <Link href="/harness" className="font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]">Harness Generator</Link>
+            <Link href="/settings" className="font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]">Settings</Link>
             <span className="font-mono text-[9px] font-medium tracking-[0.13em] text-[#6F706F]">AGENT BUILDER · BETA</span>
           </div>
         </div>

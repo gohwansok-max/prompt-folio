@@ -7,6 +7,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import HarnessGeneratorPage from "@/pages/HarnessGeneratorPage";
 import LibraryPage from "@/pages/LibraryPage";
 import NotFound from "@/pages/NotFound";
+import SettingsPage from "@/pages/SettingsPage";
 import { Route, Router as WouterRouter, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -22,6 +23,7 @@ function Router() {
         <Route path={"/agents"} component={AgentBuilderPage} />
         <Route path={"/harness"} component={HarnessGeneratorPage} />
         <Route path={"/library"} component={LibraryPage} />
+        <Route path={"/settings"} component={SettingsPage} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />

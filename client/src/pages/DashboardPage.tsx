@@ -1,4 +1,4 @@
-import { ArrowLeft, Bot, BookMarked, ChevronRight, FileDown, FileText, LayoutGrid, Layers3 } from "lucide-react";
+import { ArrowLeft, Bot, BookMarked, ChevronRight, FileDown, FileText, LayoutGrid, Layers3, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import DraftReviewBanner from "@/features/dashboard/components/DraftReviewBanner";
@@ -11,6 +11,7 @@ const QUICK_LINKS = [
   { href: "/agents", icon: Bot, title: "Agent Builder", description: "Skill·Rule·Context를 조합해 나만의 AI 전문가를 만듭니다." },
   { href: "/harness", icon: FileDown, title: "Harness Generator", description: "Agent 또는 메모를 CLAUDE.md 등 개발 환경용 파일로 내보냅니다." },
   { href: "/library", icon: BookMarked, title: "Rule · Context 라이브러리", description: "재사용할 원칙과 배경 지식을 미리 정리해 둡니다." },
+  { href: "/settings", icon: Settings2, title: "Settings", description: "마이그레이션 상태 확인, 데이터 백업·가져오기, 초기화를 관리합니다." },
 ];
 
 export default function DashboardPage() {
@@ -43,7 +44,7 @@ export default function DashboardPage() {
             <StatCard icon={BookMarked} label="PLATFORM" value={summary.harness.platforms} sublabel="내보낸 플랫폼 수" />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {QUICK_LINKS.map((link) => (
               <Link key={link.href} href={link.href} className="group flex flex-col gap-2 border border-[#1C1D21]/10 bg-white/80 p-4 transition hover:border-[#2563EB]/50">
                 <link.icon size={17} className="text-[#2563EB]" />
