@@ -6,7 +6,7 @@ export function tokenizeForSimilarity(value: string) {
 
 export function optimizeForCheapAi(value: string, intensity: OptimizationIntensity): OptimizationResult {
   if (!value.trim()) return { text: "", protectedRules: 0, mergedSentences: 0, removedFillers: 0 };
-  const criticalPattern = /(반드시|필수|금지|하지\s*마|하지\s*않|제한|주의|안전|위험|사실|근거|출처|HACCP|FSSC|ISO|개인정보|기한|마감|예산|숫자|\d+)/i;
+  const criticalPattern = /(반드시|필수|금지|하지\s*마|하지\s*않|제한|주의|안전|위험|사실|근거|출처|HACCP|FSSC|ISO|개인정보|기한|마감|예산|숫자|\d+\s*(%|원|개월|일|주|년|시간|분|건|개|명|이내|이상|이하))/i;
   const filler = intensity === "strong" ? /(정말|매우|좀|가능하면|부탁드립니다|잘|충분히|자세하게|친절하게|기본적으로|일반적으로|가능한 한|되도록|최대한|다음과 같은)/g : /(정말|매우|좀|가능하면|부탁드립니다|잘|충분히|자세하게|친절하게)/g;
   const raw = value.replace(/\r/g, "").split(/[\n.!?]+/).map((line, index) => ({ source: line.replace(/^\s*[-•*]\s*/, "").trim(), index })).filter((item) => item.source);
   let removedFillers = 0;
@@ -28,7 +28,10 @@ export function optimizeForCheapAi(value: string, intensity: OptimizationIntensi
     const exactDuplicate = selected.some((picked) => picked.text === candidate.text);
     const duplicate = exactDuplicate || selected.some((picked) => !candidate.protectedRule && similarity(candidate.tokens, picked.tokens) >= (intensity === "strong" ? 0.56 : 0.72));
     if (duplicate) { mergedSentences += 1; return; }
-    if (candidate.protectedRule || selected.length < max) selected.push(candidate);
+    // Protected sentences are ranked first (priority +100 above) so they still win the
+    // available slots, but the max cap itself always holds -- otherwise a critical-heavy
+    // input could blow past the "최대 N개 문장" the UI promises.
+    if (selected.length < max) selected.push(candidate);
   });
   const text = selected.sort((a, b) => a.index - b.index).map((item) => item.text.replace(/[.。]+$/, "")).join(intensity === "strong" ? " · " : "\n");
   return { text, protectedRules: selected.filter((item) => item.protectedRule).length, mergedSentences, removedFillers };
