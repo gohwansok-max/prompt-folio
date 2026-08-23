@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+
+  <head>
+    <meta charset="UTF-8" />
+    <title>Prompt Folio</title>
+    <script>
+      // Single Page Apps for GitHub Pages (https://github.com/rafgraph/spa-github-pages).
+      // GitHub Pages serves this file (with a 404 status) for any path that isn't a real
+      // file in the deployed branch -- i.e. every client-side route (/agents, /harness,
+      // /library, /dashboard, /settings). Encode the path into a query string and redirect
+      // to index.html, which decodes it back (see the inline script in client/index.html)
+      // before the router reads window.location.
+      var pathSegmentsToKeep = 1; // keep "/prompt-folio", the GitHub Pages project path
+      var l = window.location;
+      l.replace(
+        l.protocol + "//" + l.hostname + (l.port ? ":" + l.port : "") +
+        l.pathname.split("/").slice(0, 1 + pathSegmentsToKeep).join("/") + "/?/" +
+        l.pathname.slice(1).split("/").slice(pathSegmentsToKeep).join("/").replace(/&/g, "~and~") +
+        (l.search ? "&" + l.search.slice(1).replace(/&/g, "~and~") : "") +
+        l.hash
+      );
+    </script>
+  </head>
+
+  <body></body>
+
+</html>
