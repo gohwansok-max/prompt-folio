@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { runMigration } from "@/entities/migration/runMigration";
 import NotFound from "@/pages/NotFound";
 import { Route, Router as WouterRouter, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -26,6 +28,13 @@ function Router() {
 // - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
+  // One-time, idempotent v1 -> v2 data migration (Phase 2 of the Harness Studio
+  // architecture work). Reads existing localStorage only; writes new "harness-studio-*-v2"
+  // keys that no screen reads yet, so this has no visible effect today.
+  useEffect(() => {
+    runMigration();
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable>
