@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { runMigration } from "@/entities/migration/runMigration";
 import AgentBuilderPage from "@/pages/AgentBuilderPage";
 import HarnessGeneratorPage from "@/pages/HarnessGeneratorPage";
+import LibraryPage from "@/pages/LibraryPage";
 import NotFound from "@/pages/NotFound";
 import { Route, Router as WouterRouter, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -18,6 +19,7 @@ function Router() {
         <Route path={"/"} component={Home} />
         <Route path={"/agents"} component={AgentBuilderPage} />
         <Route path={"/harness"} component={HarnessGeneratorPage} />
+        <Route path={"/library"} component={LibraryPage} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />
