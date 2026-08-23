@@ -10,12 +10,15 @@ import { readSkills } from "@/entities/skill/storage";
 import { generateHarnessFiles } from "@/features/harness-generator/agentGenerator";
 import AgentPicker from "@/features/harness-generator/components/AgentPicker";
 import FilePreview from "@/features/harness-generator/components/FilePreview";
+import QuickGeneratePanel from "@/features/harness-generator/components/QuickGeneratePanel";
 import { saveHarnessRecord } from "@/features/harness-generator/harnessRecords";
 import PlatformPicker from "@/shared/ui/PlatformPicker";
 
 type GeneratedResult = { platform: PlatformId; files: HarnessFile[] };
+type Mode = "agent" | "quick";
 
 export default function HarnessGeneratorPage() {
+  const [mode, setMode] = useState<Mode>("agent");
   const [agents] = useState<AgentRecord[]>(readAgents);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [platforms, setPlatforms] = useState<PlatformId[]>([]);
@@ -68,31 +71,40 @@ export default function HarnessGeneratorPage() {
           <div className="section-kicker"><span className="counter">NEW</span> AI HARNESS STUDIO</div>
           <h1 className="mt-3 font-serif text-3xl font-bold tracking-[-0.04em] md:text-4xl">Harness Generator</h1>
           <p className="mt-2 max-w-2xl text-[13px] leading-6 text-[#55575B]">Agent 하나를 골라 원하는 개발 환경용 파일로 변환합니다. Claude Code는 CLAUDE.md와 Skill별 SKILL.md를, 다른 환경은 하나의 통합 문서를 만듭니다.</p>
-        </div>
-
-        <div className="space-y-5">
-          <div className="editor-card p-6 md:p-7">
-            <div className="section-kicker"><span className="counter">01</span> AGENT 선택</div>
-            <h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">어떤 Agent를 내보낼까요?</h2>
-            <div className="mt-5">
-              <AgentPicker agents={agents} selectedId={selectedAgentId} onSelect={selectAgent} />
-            </div>
+          <div className="mt-5 flex gap-1.5 border-b border-[#1C1D21]/10">
+            <button onClick={() => setMode("agent")} className={`border-b-2 px-3 py-2.5 font-mono text-[10px] font-semibold transition ${mode === "agent" ? "border-[#2563EB] text-[#2563EB]" : "border-transparent text-[#818388] hover:text-[#4E5055]"}`}>Agent 기반 생성</button>
+            <button onClick={() => setMode("quick")} className={`border-b-2 px-3 py-2.5 font-mono text-[10px] font-semibold transition ${mode === "quick" ? "border-[#2563EB] text-[#2563EB]" : "border-transparent text-[#818388] hover:text-[#4E5055]"}`}>빠른 생성 (메모에서 바로)</button>
           </div>
-
-          {selectedAgent && (
-            <div className="editor-card p-6 md:p-7">
-              <div className="section-kicker"><span className="counter">02</span> 대상 플랫폼</div>
-              <h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">어디에서 쓸 건가요?</h2>
-              <p className="mt-2 text-[12px] leading-5 text-[#66686C]">Agent Builder에서 고른 플랫폼을 기본값으로 가져왔습니다. 필요하면 바꿔도 됩니다.</p>
-              <div className="mt-4">
-                <PlatformPicker selected={platforms} onChange={setPlatforms} />
-              </div>
-              <button onClick={generate} disabled={!platforms.length} className="generate-button mt-6 w-full disabled:cursor-not-allowed disabled:opacity-40"><Sparkles size={17} /> {platforms.length || 0}개 플랫폼용 파일 생성</button>
-            </div>
-          )}
-
-          {generated && <FilePreview key={generated.at} results={generated.results} />}
+          {mode === "quick" && <p className="mt-3 max-w-2xl text-[12px] leading-5 text-[#66686C]">Agent를 만들지 않고, 메모 한 번으로 바로 문서를 뽑습니다. Prompt Folio의 기존 방식과 동일합니다.</p>}
         </div>
+
+        {mode === "quick" ? (
+          <QuickGeneratePanel />
+        ) : (
+          <div className="space-y-5">
+            <div className="editor-card p-6 md:p-7">
+              <div className="section-kicker"><span className="counter">01</span> AGENT 선택</div>
+              <h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">어떤 Agent를 내보낼까요?</h2>
+              <div className="mt-5">
+                <AgentPicker agents={agents} selectedId={selectedAgentId} onSelect={selectAgent} />
+              </div>
+            </div>
+
+            {selectedAgent && (
+              <div className="editor-card p-6 md:p-7">
+                <div className="section-kicker"><span className="counter">02</span> 대상 플랫폼</div>
+                <h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">어디에서 쓸 건가요?</h2>
+                <p className="mt-2 text-[12px] leading-5 text-[#66686C]">Agent Builder에서 고른 플랫폼을 기본값으로 가져왔습니다. 필요하면 바꿔도 됩니다.</p>
+                <div className="mt-4">
+                  <PlatformPicker selected={platforms} onChange={setPlatforms} />
+                </div>
+                <button onClick={generate} disabled={!platforms.length} className="generate-button mt-6 w-full disabled:cursor-not-allowed disabled:opacity-40"><Sparkles size={17} /> {platforms.length || 0}개 플랫폼용 파일 생성</button>
+              </div>
+            )}
+
+            {generated && <FilePreview key={generated.at} results={generated.results} />}
+          </div>
+        )}
       </main>
     </div>
   );
