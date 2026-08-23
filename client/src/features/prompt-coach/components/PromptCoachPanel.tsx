@@ -1,0 +1,7 @@
+import { Check, Plus } from "lucide-react";
+import type { PromptReview, PromptSuggestion } from "../types";
+
+export default function PromptCoachPanel({ review, applySuggestion }: { review: PromptReview; applySuggestion: (suggestion: PromptSuggestion) => void }) {
+  const status = review.score >= 80 ? "완성도 높음" : review.score >= 40 ? "조금만 보완" : "시작 문구 보완";
+  return <section className="prompt-coach" aria-label="AI 프롬프트 코치"><div className="prompt-coach-head"><div><div className="section-kicker"><span className="counter">AI COACH</span> PROMPT REVIEW</div><h3>AI가 이해하기 쉬운지 점검했어요</h3><p>목적·대상·결과 모양·기준을 확인하고, 필요한 문장만 제안합니다.</p></div><div className="coach-score"><strong>{review.score}</strong><span>/ 100</span><em>{status}</em></div></div><div className="coach-checks">{review.checks.map((check) => <span key={check.label} className={check.ready ? "is-ready" : ""}>{check.ready ? <Check size={11} /> : <span className="coach-dot" />}{check.label}</span>)}</div>{review.suggestions.length ? <div className="mt-4 space-y-2">{review.suggestions.map((suggestion) => <div key={suggestion.id} className="coach-suggestion"><div><strong>{suggestion.label}</strong><p>{suggestion.detail}</p><code>{suggestion.addition}</code></div><button onClick={() => applySuggestion(suggestion)}>문장 추가 <Plus size={13} /></button></div>)}</div> : <div className="coach-success"><Check size={15} /> 필요한 핵심 요소가 담겼습니다. 이제 ‘문서 만들기’를 눌러도 좋습니다.</div>}</section>;
+}

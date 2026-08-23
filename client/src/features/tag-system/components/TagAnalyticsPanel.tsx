@@ -1,0 +1,11 @@
+import { BarChart3, Target, ThumbsDown, ThumbsUp } from "lucide-react";
+import type { TagFeedback } from "../types";
+
+export default function TagAnalyticsPanel({ feedback }: { feedback: TagFeedback }) {
+  const rows = Object.entries(feedback).map(([tag, value]) => ({ tag, ...value, total: value.accepted + value.rejected })).filter((item) => item.total > 0).sort((a, b) => b.total - a.total || b.accepted - a.accepted).slice(0, 6);
+  const accepted = rows.reduce((sum, item) => sum + item.accepted, 0);
+  const rejected = rows.reduce((sum, item) => sum + item.rejected, 0);
+  const total = accepted + rejected;
+  const accuracy = total ? Math.round((accepted / total) * 100) : 0;
+  return <div className="editor-card p-6 md:p-7"><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">05</span> FEEDBACK ANALYTICS</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">태그 추천 정확도</h2></div><div className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/15 bg-white text-[#2563EB]"><BarChart3 size={15} /></div></div><p className="mt-2 text-[12px] leading-5 text-[#66686C]">수락·거절 기록은 이 브라우저 안에서만 집계되며, 다음 추천 순위에 반영됩니다.</p>{total === 0 ? <div className="mt-5 border border-dashed border-[#1C1D21]/15 bg-[#F0ECE4] px-4 py-5 font-mono text-[10px] leading-5 text-[#77797C]">추천 태그를 수락하거나 거절하면 정확도·선호 태그 통계가 쌓입니다.</div> : <><div className="mt-5 grid grid-cols-3 gap-2"><div className="analytics-metric"><Target size={13} /><strong>{accuracy}%</strong><span>수락률</span></div><div className="analytics-metric"><ThumbsUp size={13} /><strong>{accepted}</strong><span>수락</span></div><div className="analytics-metric"><ThumbsDown size={13} /><strong>{rejected}</strong><span>거절</span></div></div><div className="mt-4 space-y-3">{rows.map((item) => { const rate = Math.round((item.accepted / item.total) * 100); return <div key={item.tag}><div className="flex items-center justify-between font-mono text-[9px]"><span className="font-semibold text-[#4E5055]">#{item.tag}</span><span className="text-[#73757A]">수락 {item.accepted} · 거절 {item.rejected} · {rate}%</span></div><div className="mt-1 h-1.5 overflow-hidden bg-[#E7E2D9]"><div className="h-full bg-[#2563EB]" style={{ width: `${rate}%` }} /></div></div>; })}</div></>}</div>;
+}

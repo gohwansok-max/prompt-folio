@@ -1,0 +1,14 @@
+import { ChevronRight, Clipboard, FileText, Tag, WandSparkles } from "lucide-react";
+
+export default function OnboardingModal({ open, step, setStep, onFinish, onPractice }: { open: boolean; step: number; setStep: (step: number) => void; onFinish: () => void; onPractice: (target: string, message: string) => void }) {
+  if (!open) return null;
+  const slides = [
+    { icon: <WandSparkles size={24} />, label: "1단계 · 메모", title: "완벽하게 쓰지 않아도 됩니다", body: "AI에게 시킬 일, 원하는 결과 모습, 꼭 지킬 기준을 평소 말하듯 적어 주세요. 짧은 메모나 불릿도 괜찮습니다.", note: "막막하면 ‘쉬운 예시’ 버튼을 눌러 내 업무에 맞게 단어만 바꾸세요.", target: "step-note", practice: "여기에서 AI에게 시킬 일을 한두 문장으로 적어 보세요." },
+    { icon: <Tag size={24} />, label: "2단계 · 태그", title: "태그는 나중에 다시 찾기 위한 이름표입니다", body: "추천 태그를 수락하거나 자주 쓰는 태그 묶음을 한 번에 적용하세요. 지금 건너뛰어도 문서는 만들 수 있습니다.", note: "예: HACCP, 보고서, 유튜브, 데이터분석", target: "step-tags", practice: "추천 태그 하나를 수락하거나 필요한 태그를 쉼표로 적어 보세요." },
+    { icon: <FileText size={24} />, label: "3단계 · 문서 만들기", title: "AI 서비스를 고르고 문서를 만드세요", body: "Claude, ChatGPT 등 필요한 서비스를 선택한 뒤 ‘문서 만들기’를 누르면 시작 지침과 스킬 문서가 정리됩니다.", note: "기본 선택 그대로 만들어도 됩니다.", target: "step-create", practice: "서비스를 고른 뒤 ‘문서 만들기’를 눌러 보세요." },
+    { icon: <Clipboard size={24} />, label: "4단계 · 복사·저장", title: "완성된 문서를 AI 대화 첫 메시지에 붙여넣으세요", body: "복사 버튼으로 바로 사용하거나 Markdown 파일로 저장하세요. 자주 쓰는 문서는 로컬 보관함에 저장할 수 있습니다.", note: "고급 기능은 오른쪽 위 설정에서 필요할 때만 열어 보세요.", target: "step-result", practice: "완성된 문서를 복사하거나 필요한 위치에 저장해 보세요." },
+  ];
+  const current = slides[step];
+  const go = (next: number) => { setStep(next); };
+  return <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Prompt Folio 처음 사용 안내"><div className="onboarding-card"><button className="onboarding-skip" onClick={onFinish}>건너뛰기</button><div className="onboarding-step-label">STEP {step + 1} / {slides.length}</div><div className="onboarding-icon">{current.icon}</div><div className="onboarding-label">{current.label}</div><h2>{current.title}</h2><p>{current.body}</p><div className="onboarding-note">{current.note}</div><div className="onboarding-progress">{slides.map((slide, index) => <button key={slide.target} onClick={() => go(index)} aria-label={`${index + 1}단계 ${slide.label}`} className={index === step ? "is-current" : index < step ? "is-done" : ""} />)}</div><div className="mt-5 border-t border-[#1C1D21]/10 pt-4"><button className="onboarding-practice" onClick={() => onPractice(current.target, current.practice)}>이 단계 직접 해 보기 <ChevronRight size={14} /></button><p>안내창이 닫히고 해당 위치가 강조됩니다.</p></div><div className="mt-5 flex items-center justify-between gap-3"><button className="onboarding-back" onClick={() => go(Math.max(0, step - 1))} disabled={step === 0}>이전</button><button className="onboarding-next" onClick={() => step === slides.length - 1 ? onFinish() : go(step + 1)}>{step === slides.length - 1 ? "가이드 마치기" : "다음"}<ChevronRight size={15} /></button></div></div></div>;
+}
