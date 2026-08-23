@@ -1,4 +1,4 @@
-import type { PlatformId } from "@/entities/harness/types";
+import type { PlatformId } from "./types";
 
 export const PRESET_PLATFORMS: { id: PlatformId; label: string; file: string }[] = [
   { id: "claude-code", label: "Claude Code", file: "CLAUDE.md" },

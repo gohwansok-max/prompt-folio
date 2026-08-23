@@ -1,4 +1,5 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { FileOutput, Pencil, Plus, Trash2 } from "lucide-react";
+import { Link } from "wouter";
 import type { AgentRecord } from "@/entities/agent/types";
 
 export default function AgentList({ agents, onCreate, onEdit, onDelete }: {
@@ -35,6 +36,7 @@ export default function AgentList({ agents, onCreate, onEdit, onDelete }: {
                 </span>
               </button>
               <div className="flex shrink-0 items-center gap-2">
+                {agent.status === "confirmed" && <Link href={`/harness?agent=${agent.id}`} aria-label={`${agent.name}로 Harness 생성`} className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/10 text-[#606269] transition hover:border-[#2563EB] hover:text-[#2563EB]"><FileOutput size={13} /></Link>}
                 <button onClick={() => onEdit(agent)} aria-label={`${agent.name} 편집`} className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/10 text-[#606269] transition hover:border-[#2563EB] hover:text-[#2563EB]"><Pencil size={13} /></button>
                 <button onClick={() => onDelete(agent)} aria-label={`${agent.name} 삭제`} className="flex h-8 w-8 items-center justify-center border border-[#1C1D21]/10 text-[#85878A] transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /></button>
               </div>

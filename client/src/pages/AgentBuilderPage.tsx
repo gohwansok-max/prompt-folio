@@ -27,7 +27,10 @@ export default function AgentBuilderPage() {
       <header className="sticky top-0 z-30 border-b border-[#1C1D21]/10 bg-[#F7F4ED]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-[70px] max-w-[1000px] items-center justify-between px-5 md:px-8">
           <Link href="/" className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]"><ArrowLeft size={14} /> Prompt Folio로 돌아가기</Link>
-          <span className="font-mono text-[9px] font-medium tracking-[0.13em] text-[#6F706F]">AGENT BUILDER · BETA</span>
+          <div className="flex items-center gap-3">
+            <Link href="/harness" className="font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]">Harness Generator</Link>
+            <span className="font-mono text-[9px] font-medium tracking-[0.13em] text-[#6F706F]">AGENT BUILDER · BETA</span>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-[1000px] px-5 pb-14 pt-8 md:px-8 md:pt-11">
