@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { runMigration } from "@/entities/migration/runMigration";
+import AgentBuilderPage from "@/pages/AgentBuilderPage";
 import NotFound from "@/pages/NotFound";
 import { Route, Router as WouterRouter, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -14,6 +15,7 @@ function Router() {
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "") || "/"}>
       <Switch>
         <Route path={"/"} component={Home} />
+        <Route path={"/agents"} component={AgentBuilderPage} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />
@@ -29,8 +31,8 @@ function Router() {
 
 function App() {
   // One-time, idempotent v1 -> v2 data migration (Phase 2 of the Harness Studio
-  // architecture work). Reads existing localStorage only; writes new "harness-studio-*-v2"
-  // keys that no screen reads yet, so this has no visible effect today.
+  // architecture work). Reads existing localStorage only, writes the "harness-studio-*-v2"
+  // keys that /agents (Phase 3) reads.
   useEffect(() => {
     runMigration();
   }, []);
