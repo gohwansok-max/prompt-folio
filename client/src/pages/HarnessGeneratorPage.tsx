@@ -64,6 +64,7 @@ export default function HarnessGeneratorPage() {
         <div className="mx-auto flex h-[70px] max-w-[1000px] items-center justify-between px-5 md:px-8">
           <Link href="/agents" className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]"><ArrowLeft size={14} /> Agent Builder로 돌아가기</Link>
           <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]">Dashboard</Link>
             <Link href="/library" className="font-mono text-[10px] font-semibold text-[#67696C] transition hover:text-[#2563EB]">Rule · Context</Link>
             <span className="font-mono text-[9px] font-medium tracking-[0.13em] text-[#6F706F]">HARNESS GENERATOR · BETA</span>
           </div>

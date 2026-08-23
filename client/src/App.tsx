@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { runMigration } from "@/entities/migration/runMigration";
 import AgentBuilderPage from "@/pages/AgentBuilderPage";
+import DashboardPage from "@/pages/DashboardPage";
 import HarnessGeneratorPage from "@/pages/HarnessGeneratorPage";
 import LibraryPage from "@/pages/LibraryPage";
 import NotFound from "@/pages/NotFound";
@@ -17,6 +18,7 @@ function Router() {
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <Switch>
         <Route path={"/"} component={Home} />
+        <Route path={"/dashboard"} component={DashboardPage} />
         <Route path={"/agents"} component={AgentBuilderPage} />
         <Route path={"/harness"} component={HarnessGeneratorPage} />
         <Route path={"/library"} component={LibraryPage} />
