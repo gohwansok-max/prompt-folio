@@ -57,8 +57,12 @@ import flowImage from "@/assets/prompt-folio-flow.webp";
 import heroImage from "@/assets/prompt-folio-hero.webp";
 import markImage from "@/assets/prompt-folio-mark.webp";
 
+const ADVANCED_MODE_KEY = "prompt-folio-advanced-mode-v1";
+
 export default function Home() {
   const { theme, toggleTheme } = useTheme();
+  const [advancedMode, setAdvancedMode] = useState(() => typeof window !== "undefined" && window.localStorage.getItem(ADVANCED_MODE_KEY) === "on");
+  const [showTemplates, setShowTemplates] = useState(false);
   const [title, setTitle] = useState("연구소 업무 보조");
   const [notes, setNotes] = useState("");
   const [detail, setDetail] = useState<DetailLevel>("compact");
@@ -162,8 +166,22 @@ export default function Home() {
     setOnboardingStep(0); setOnboardingOpen(true);
   }
 
+  function toggleAdvancedMode() {
+    setAdvancedMode((current) => {
+      const next = !current;
+      window.localStorage.setItem(ADVANCED_MODE_KEY, next ? "on" : "off");
+      return next;
+    });
+  }
+
+  function revealTagsStep() {
+    if (!advancedMode) { window.localStorage.setItem(ADVANCED_MODE_KEY, "on"); setAdvancedMode(true); }
+    window.setTimeout(() => scrollToStep("step-tags"), 30);
+  }
+
   function practiceOnboardingStep(target: string, message: string) {
     finishOnboarding(); setGuideFocus(target); setGuideMessage(message);
+    if (target === "step-tags" && !advancedMode) { window.localStorage.setItem(ADVANCED_MODE_KEY, "on"); setAdvancedMode(true); }
     window.setTimeout(() => scrollToStep(target), 30);
   }
 
@@ -396,17 +414,20 @@ function applyBackupImport() {
     </div></header>
     <main id="top" className="mx-auto max-w-[1540px] px-5 pb-14 pt-8 md:px-8 md:pt-11">
       <section className="hero-sheet relative overflow-hidden border border-[#1C1D21]/10 bg-[#EEE9DF] p-7 md:p-10"><div className="relative z-10 max-w-3xl"><div className="section-kicker"><span className="counter">01</span> NOTE → INSTRUCTION</div><h1 className="mt-5 font-serif text-4xl font-bold leading-[1.08] tracking-[-0.055em] text-[#1B1D25] md:text-6xl">막 적어도 됩니다.<br /><em className="font-serif font-normal text-[#2563EB]">필요한 지침만</em> 남깁니다.</h1><p className="mt-5 max-w-xl text-[15px] leading-7 text-[#53555A]">내가 쓰는 기능, 업무 습관, 하네스를 자연어로 적으면 서비스별 시작 지침과 재사용 스킬 Markdown으로 압축합니다.</p></div><img src={heroImage} alt="흩어진 메모가 정리된 문서로 변환되는 추상 일러스트" className="pointer-events-none absolute -right-12 -top-8 hidden h-full w-[57%] object-cover mix-blend-multiply opacity-80 lg:block" /><div className="relative z-10 mt-8 flex flex-wrap gap-2">{["Claude", "ChatGPT", "Gemini", "Manus", "Perplexity"].map((name) => <span key={name} className="border border-[#1C1D21]/15 bg-[#F7F4ED]/75 px-3 py-1.5 font-mono text-[10px] font-medium tracking-wide text-[#4E5055]">{name}</span>)}</div></section>
-      <BeginnerGuide notesReady={Boolean(notes.trim())} tagsReady={Boolean(tagInput.trim())} generated={hasGenerated} loadExample={loadExample} makeDocument={generate} />
-      <TemplatePicker selectedId={selectedTemplateId} setSelectedId={setSelectedTemplateId} applyTemplate={applyTemplate} />
+      <BeginnerGuide notesReady={Boolean(notes.trim())} tagsReady={Boolean(tagInput.trim())} generated={hasGenerated} loadExample={loadExample} makeDocument={generate} revealTagsStep={revealTagsStep} />
+      <div className="advanced-nudge mt-5"><span><WandSparkles size={14} /> 처음에는 메모 → 문서 만들기만으로 충분해요. 템플릿이나 보관함·태그 그룹 같은 추가 도구는 필요할 때만 열어보세요.</span><div className="flex flex-wrap gap-2"><button onClick={() => setShowTemplates((current) => !current)}>{showTemplates ? "템플릿 접기" : "템플릿 보기"} <ChevronRight size={13} /></button><button onClick={toggleAdvancedMode}>{advancedMode ? "간단 모드로 보기" : "보관함·태그 그룹 열기"} <ChevronRight size={13} /></button></div></div>
+      {showTemplates && <TemplatePicker selectedId={selectedTemplateId} setSelectedId={setSelectedTemplateId} applyTemplate={applyTemplate} />}
       <section className="mt-7 grid gap-7 xl:grid-cols-[minmax(360px,5fr)_minmax(560px,7fr)]"><div className="space-y-5">
         <div id="step-note" className={`editor-card scroll-mt-24 p-6 md:p-7 ${guideFocus === "step-note" ? "guide-focus" : ""}`}><div className="flex items-start justify-between gap-4"><div><div className="section-kicker"><span className="counter">02</span> RAW NOTES</div><h2 className="mt-3 font-serif text-2xl font-bold tracking-[-0.04em]">먼저, 원하는 일을 적어 주세요</h2></div><button onClick={loadExample} className="inline-flex shrink-0 items-center gap-1.5 border border-[#1C1D21]/15 bg-white px-3 py-2 font-mono text-[10px] font-semibold transition hover:border-[#2563EB] hover:text-[#2563EB] active:scale-[0.97]"><WandSparkles size={13} /> 쉬운 예시</button></div><p className="beginner-inline-tip">무엇을 만들지, 답변이 어떤 모양이면 좋은지, 꼭 지킬 기준만 적으세요. 문장이 완벽하지 않아도 됩니다.</p>
           <label className="mt-7 block"><span className="field-label">문서 이름 <HelpTip text="나중에 보관함에서 찾기 쉬운 이름입니다. 비워도 됩니다." /></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 연구소 업무 보조" className="field-input mt-2" /></label><label className="mt-5 block"><span className="field-label">기능 · 업무 · 말투 · 금지 사항 <HelpTip text="AI에게 시킬 일, 원하는 결과, 꼭 지킬 기준을 적어 주세요." /></span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} aria-describedby="live-quality-status" placeholder="예: 매일 작성하는 보고서, 원하는 답변 방식, 반드시 지킬 기준을 편하게 적어 주세요." className="field-input mt-2 min-h-[238px] resize-y py-3 leading-7" /></label><div className="mt-2 flex justify-between font-mono text-[10px] text-[#888A8C]"><span>문장·불릿 모두 가능</span><span>{notes.length.toLocaleString()} chars</span></div>
           <LivePromptQualityMeter review={promptReview} isUpdating={notes !== deferredNotes} />
           <PromptEnhanceAction review={promptReview} enhance={enhancePrompt} canUndo={previousNotes !== null} undo={undoEnhancement} />
-          <PromptCoachPanel review={promptReview} applySuggestion={applyPromptSuggestion} />
+          {advancedMode && <PromptCoachPanel review={promptReview} applySuggestion={applyPromptSuggestion} />}
         </div>
-        <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} guideFocus={guideFocus === "step-tags"} />
-        <TagGroupsPanel groups={tagGroups} name={tagGroupName} setName={setTagGroupName} tags={tagGroupInput} setTags={setTagGroupInput} saveGroup={saveTagGroup} applyGroup={applyTagGroup} deleteGroup={deleteTagGroup} />
+        {advancedMode && <>
+          <LibraryPanel saveName={saveName} setSaveName={setSaveName} saveKind={saveKind} setSaveKind={setSaveKind} tagInput={tagInput} setTagInput={setTagInput} libraryQuery={libraryQuery} setLibraryQuery={setLibraryQuery} kindFilter={kindFilter} setKindFilter={setKindFilter} tagFilter={tagFilter} setTagFilter={setTagFilter} allTags={allTags} suggestedTags={suggestedTags} applySuggestedTag={applySuggestedTag} rejectSuggestedTag={rejectSuggestedTag} filteredLibrary={filteredLibrary} libraryCount={library.length} saveToLibrary={saveToLibrary} loadFromLibrary={loadFromLibrary} deleteFromLibrary={deleteFromLibrary} guideFocus={guideFocus === "step-tags"} />
+          <TagGroupsPanel groups={tagGroups} name={tagGroupName} setName={setTagGroupName} tags={tagGroupInput} setTags={setTagGroupInput} saveGroup={saveTagGroup} applyGroup={applyTagGroup} deleteGroup={deleteTagGroup} />
+        </>}
         <div className="advanced-nudge"><span><Settings2 size={14} /> 더 세밀하게 설정하고 싶나요?</span><button onClick={() => setSystemOpen(true)}>시스템 설정 열기 <ChevronRight size={13} /></button></div>
         <div id="step-create" className={`editor-card scroll-mt-24 p-6 md:p-7 ${guideFocus === "step-create" ? "guide-focus" : ""}`}><div className="section-kicker"><span className="counter">08</span> COMPILE OPTIONS</div><div className="mt-5 grid gap-6 sm:grid-cols-2"><div><span className="field-label">압축 강도</span><div className="mt-2 grid grid-cols-3 border border-[#1C1D21]/15 p-1">{(["compact", "balanced", "detailed"] as DetailLevel[]).map((item) => <button key={item} onClick={() => setDetail(item)} className={`px-2 py-2 font-mono text-[10px] transition ${detail === item ? "bg-[#1C1D21] text-white" : "text-[#67696C] hover:bg-[#EEE9DF]"}`}>{item === "compact" ? "짧게" : item === "balanced" ? "균형" : "자세히"}</button>)}</div></div><div><span className="field-label">선택 서비스</span><div className="mt-2 flex flex-wrap gap-1.5">{PROVIDERS.map((provider) => <button key={provider.id} onClick={() => toggleProvider(provider.id)} className={`provider-check ${selected.includes(provider.id) ? "is-active" : ""}`} style={{ "--provider": provider.color } as CSSProperties}><span className="check-dot">{selected.includes(provider.id) && <Check size={10} strokeWidth={3} />}</span>{provider.label}</button>)}</div></div></div><button onClick={generate} className="generate-button mt-7 w-full"><Sparkles size={17} /> {selected.length}개 서비스용 Markdown 만들기 <ChevronRight size={17} /></button></div>
       </div>
