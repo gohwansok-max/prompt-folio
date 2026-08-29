@@ -63,6 +63,13 @@ Tailwind CSS v4 (via `@tailwindcss/vite`, not a `tailwind.config` JS file) with 
 
 Most UI copy, tag taxonomies (e.g. `features/tag-system/constants.ts`), and product notes (`api-integration-notes.md`, `deployment-notes.md`, `todo.md`) are in Korean, targeting Korean-language users (food QC/HACCP professionals per the tag set, plus general prompt-authoring use cases). Keep new user-facing strings and tag/keyword lists consistent with this — don't switch existing copy to English.
 
+### Key entry points (start here when tracing a behavior)
+
+- **v1→v2 migration trigger**: `App.tsx:44-45` calls `runMigration()` inside a top-level `useEffect` on every boot; the actual read/snapshot/write logic is in `entities/migration/runMigration.ts`. To change when/how migration runs, start at the `App.tsx` call site, not inside individual entity storage files.
+- **localStorage key constants**: each feature/entity exports its own `*_KEY` constant next to its storage helpers, e.g. `AGENT_KEY` in `entities/agent/storage.ts:3`. Grep for `_KEY = "` to find every key currently in use before adding a new one — never hardcode a key string at a call site.
+- **Route registration**: `App.tsx`'s `<Switch>` is the single place routes are wired to pages; a new page under `client/src/pages/` isn't reachable until it's added there too.
+- **Theme default**: `contexts/ThemeContext.tsx` plus the `NOTE: About Theme` comment in `App.tsx` — read both before touching default theme or adding theme-aware styling.
+
 ### Non-source docs worth knowing about (not code, but track project state)
 
 - `todo.md` — running, mostly-checked-off feature backlog in Korean.
